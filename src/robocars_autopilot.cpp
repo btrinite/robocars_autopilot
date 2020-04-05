@@ -278,9 +278,10 @@ int main(int argc, char **argv)
     // wait for FCU connection
     ros::Rate rate(loop_hz);
     while(ros::ok()){
-        ros::spinOnce();
-        send_event (TickEvent());
-        rate.sleep();
+        ros::spin();
+        //ros::spinOnce();
+        //send_event (TickEvent());
+        //rate.sleep();
     }
 }
 
