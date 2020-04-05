@@ -203,7 +203,7 @@ void RosInterface::publishPredict(_Float32 steering, _Float32 throttling) {
 
 void RosInterface::initParam() {
     if (!node_.hasParam("loop_hz")) {
-        node_.setParam ("loop_hz", 30);       
+        node_.setParam ("loop_hz", 60);       
     }
     if (!node_.hasParam("model_filename")) {
         node_.setParam("model_filename",  std::string("modelcat"));
