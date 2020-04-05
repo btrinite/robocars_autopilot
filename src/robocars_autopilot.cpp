@@ -35,6 +35,7 @@
 
 #include <robocars_msgs/robocars_brain_state.h>
 #include <robocars_msgs/robocars_tof.h>
+#include <robocars_msgs/robocars_autopilot_output.h>
 
 #include <robocars_autopilot.hpp>
 
@@ -69,6 +70,10 @@ class onRunningMode
         };
 
         void react( AutonomousDrivingEvent const & e) override { 
+            RobocarsStateMachine::react(e);
+        };
+
+        void react( PredictEvent const & e) override { 
             RobocarsStateMachine::react(e);
         };
 
@@ -155,6 +160,11 @@ class onAutonomousDriving
             transit<onManualDriving>();
         };
 
+        void react( PredictEvent const & e) override { 
+            ri->publishPredict(e.steering_value, e.throttling_value);
+            onRunningMode::react(e);
+        };
+
         virtual void react(TickEvent                      const & e) override { 
             onRunningMode::react(e);
         };
@@ -167,6 +177,28 @@ uint32_t mapRange(uint32_t in1,uint32_t in2,uint32_t out1,uint32_t out2,uint32_t
   if (value<in1) {value=in1;}
   if (value>in2) {value=in2;}
   return out1 + ((value-in1)*(out2-out1))/(in2-in1);
+}
+
+void RosInterface::predict() {
+}
+
+void RosInterface::publishPredict(_Float32 steering, _Float32 throttling) {
+    robocars_msgs::robocars_autopilot_output steeringMsg;
+    robocars_msgs::robocars_autopilot_output throttlingMsg;
+
+    steeringMsg.header.stamp = ros::Time::now();
+    steeringMsg.header.seq=1;
+    steeringMsg.header.frame_id = "pilotSteering";
+    steeringMsg.norm = steering;
+
+    autopilot_steering_pub.publish(steeringMsg);
+
+    throttlingMsg.header.stamp = ros::Time::now();
+    throttlingMsg.header.seq=1;
+    throttlingMsg.header.frame_id = "pilotSteering";
+    throttlingMsg.norm = steering;
+
+    autopilot_throttling_pub.publish(throttlingMsg);
 }
 
 void RosInterface::initParam() {
@@ -189,12 +221,16 @@ void RosInterface::initSub () {
     tof2_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof2", 1, &RosInterface::tof2_msg_cb, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 1, &RosInterface::state_msg_cb, this);
 }
+void RosInterface::initPub() {
+        autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 10);
+        autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 10);
+}
 
 static uint32_t lastTof1Value;
 static uint32_t lastTof2Value;
 
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
-
+        send_event(PredictEvent(0.0,0.0));
 }
 
 void RosInterface::tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg){
@@ -230,6 +266,7 @@ int main(int argc, char **argv)
     
     ri = new RosInterface;
 
+    ri->initPub();
     fsm_list::start();
     ri->initSub();
 

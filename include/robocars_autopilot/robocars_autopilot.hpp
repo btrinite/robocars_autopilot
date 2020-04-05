@@ -16,6 +16,11 @@ struct TickEvent                    : BaseEvent { public: TickEvent() : BaseEven
 struct IdleStatusEvent              : BaseEvent { public: IdleStatusEvent() : BaseEvent("IdleStatusEvent") {}; };
 struct ManualDrivingEvent           : BaseEvent { public: ManualDrivingEvent() : BaseEvent("ManualDrivingEvent") {}; };
 struct AutonomousDrivingEvent       : BaseEvent { public: AutonomousDrivingEvent() : BaseEvent("AutonomousDrivingEvent") {}; };
+struct PredictEvent                 : BaseEvent { public: 
+    PredictEvent(const _Float32 steeringValue, const _Float32 throttlingValue) : steering_value(steeringValue), throttling_value(throttlingValue), BaseEvent("PredictEvent") {};
+    _Float32 steering_value; 
+    _Float32 throttling_value; 
+    };
 
 class RobocarsStateMachine
 : public tinyfsm::Fsm<RobocarsStateMachine>
@@ -36,6 +41,7 @@ class RobocarsStateMachine
         virtual void react(IdleStatusEvent                const & e) { logEvent(e); };
         virtual void react(ManualDrivingEvent             const & e) { logEvent(e); };
         virtual void react(AutonomousDrivingEvent         const & e) { logEvent(e); };
+        virtual void react(PredictEvent                   const & e) {  };
 
         virtual void entry(void) { 
             ROS_INFO("State %s: entering", getStateName()); 
@@ -80,13 +86,19 @@ class RosInterface
         void initParam();
         void updateParam();
         void initSub();
+        void initPub();
+
+        void predict();
+        void publishPredict(_Float32 steering, _Float32 throttling);
 
     private:
-
         void state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg);
 
         ros::NodeHandle node_;
         ros::Subscriber state_sub;
+        ros::Publisher autopilot_throttling_pub;
+        ros::Publisher autopilot_steering_pub;
+
 
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
         void tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg);
