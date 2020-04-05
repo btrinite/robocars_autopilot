@@ -230,6 +230,11 @@ static uint32_t lastTof1Value;
 static uint32_t lastTof2Value;
 
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
+    static uint32_t lastSeq = 0;
+
+    if (image_msg->header.seq != (lastSeq+1)) {
+        ROS_INFO("Image topic seq issue, expected : %d, got %d", lastSeq+1, image_msg->header.seq);
+    }
     static _Float32 fake_steering_value = -1.0;
     send_event(PredictEvent(fake_steering_value,0.0));
     fake_steering_value = fake_steering_value + 0.1;
