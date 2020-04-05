@@ -233,7 +233,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
     static _Float32 fake_steering_value = -1.0;
     send_event(PredictEvent(fake_steering_value,0.0));
     fake_steering_value = fake_steering_value + 0.1;
-    if (fake_steering_value>1.0) {fake_steering_value = -1.0;}
+    if (fake_steering_value>1.1) {fake_steering_value = -1.0;}
 }
 
 void RosInterface::tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg){
