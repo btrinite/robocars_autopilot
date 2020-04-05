@@ -230,7 +230,10 @@ static uint32_t lastTof1Value;
 static uint32_t lastTof2Value;
 
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
-        send_event(PredictEvent(0.0,0.0));
+    static _Float32 fake_steering_value = -1.0;
+    send_event(PredictEvent(fake_steering_value,0.0));
+    fake_steering_value = fake_steering_value + 0.1;
+    if (fake_steering_value>1.0) {fake_steering_value = -1.0;}
 }
 
 void RosInterface::tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg){
