@@ -286,7 +286,7 @@ void RosInterface::initStats(void) {
 bool RosInterface::updateStats(uint32_t received, uint32_t missed) {
     totalImages+=received;
     missedImages+=missed;
-    if ((missedImages%10)==0) {
+    if ((missedImages%10)==9) {
         return true;
     }
     return false;
