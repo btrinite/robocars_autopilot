@@ -85,6 +85,11 @@ class onRunningMode
         };
 
         void react(TickEvent const & e) override {
+            RobocarsStateMachine::react(e);
+            __tick_count++;
+            if (__tick_count%(2000/loop_hz)==0) {
+                ri->reportStats();
+            }
         };
 
 };
@@ -96,11 +101,8 @@ class onIdle
         onIdle() : onRunningMode("onArm") {};
 
     private:
-        uint32_t __tick_count;
-
         void entry(void) override {
             onRunningMode::entry();
-            __tick_count=0;
         };
   
         void react(ManualDrivingEvent const & e) override { 
@@ -111,11 +113,6 @@ class onIdle
 
         void react(TickEvent const & e) override {
             onRunningMode::react(e);
-            __tick_count++;
-            if (__tick_count%(2000/loop_hz)==0) {
-                ri->reportStats();
-            }
-
         };
 
 };
@@ -321,10 +318,10 @@ int main(int argc, char **argv)
     // wait for FCU connection
     ros::Rate rate(loop_hz);
     while(ros::ok()){
-        ros::spin();
-        //ros::spinOnce();
-        //send_event (TickEvent());
-        //rate.sleep();
+        // ros::spin();
+        ros::spinOnce();
+        send_event (TickEvent());
+        rate.sleep();
     }
 }
 
