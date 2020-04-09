@@ -241,8 +241,10 @@ static uint32_t lastTof2Value;
 
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
     static uint32_t lastSeq = 0;
-
-    updateStats(1, image_msg->header.seq-(lastSeq+1));
+    
+    if (updateStats(1, image_msg->header.seq-(lastSeq+1))) {
+        ROS_WARN ("Autopilot: Losing images");
+    };
     lastSeq = image_msg->header.seq;
     static _Float32 fake_steering_value = -1.0;
     send_event(PredictEvent(fake_steering_value,0.0));
@@ -284,6 +286,10 @@ void RosInterface::initStats(void) {
 void RosInterface::updateStats(uint32_t received, uint32_t missed) {
     totalImages+=received;
     missedImages+=missed;
+    if ((missedImages%10)==0) {
+        return true;
+    }
+    return false;
 }
 
 void RosInterface::reportStats(void) {
