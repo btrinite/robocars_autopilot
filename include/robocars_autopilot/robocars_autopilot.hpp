@@ -93,7 +93,7 @@ class RosInterface
 
         void initStats();
         void reportStats();
-        boolean updateStats(uint32_t received, uint32_t missed);
+        bool updateStats(uint32_t received, uint32_t missed);
     private:
         void state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg);
 

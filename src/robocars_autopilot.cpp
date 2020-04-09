@@ -283,7 +283,7 @@ void RosInterface::initStats(void) {
     missedImages=0;
 }
 
-void RosInterface::updateStats(uint32_t received, uint32_t missed) {
+bool RosInterface::updateStats(uint32_t received, uint32_t missed) {
     totalImages+=received;
     missedImages+=missed;
     if ((missedImages%10)==0) {
