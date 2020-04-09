@@ -91,6 +91,9 @@ class RosInterface
         void predict();
         void publishPredict(_Float32 steering, _Float32 throttling);
 
+        void initStats();
+        void reportStats();
+        void updateStats(uint32_t received, uint32_t missed);
     private:
         void state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg);
 
@@ -111,5 +114,11 @@ class RosInterface
 
         tensorflow::Session* session;
         tensorflow::GraphDef graph_def;
+
+        // stats
+        uint32_t totalImages=0;
+        uint32_t missedImages=0;
+        ros::Publisher stats_pub;
+
 };
 

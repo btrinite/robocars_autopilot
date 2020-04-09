@@ -37,10 +37,13 @@
 #include <robocars_msgs/robocars_tof.h>
 #include <robocars_msgs/robocars_autopilot_output.h>
 
+#include <robocars_autopilot/robocars_autopilot_stats.h>
+
 #include <robocars_autopilot.hpp>
 
 RosInterface * ri;
 
+// Paran
 static int loop_hz;
 static std::string model_filename;
 
@@ -93,9 +96,11 @@ class onIdle
         onIdle() : onRunningMode("onArm") {};
 
     private:
+        uint32_t __tick_count;
 
         void entry(void) override {
             onRunningMode::entry();
+            __tick_count=0;
         };
   
         void react(ManualDrivingEvent const & e) override { 
@@ -106,6 +111,11 @@ class onIdle
 
         void react(TickEvent const & e) override {
             onRunningMode::react(e);
+            __tick_count++;
+            if (__tick_count%(2000/loop_hz)==0) {
+                ri->reportStats();
+            }
+
         };
 
 };
@@ -120,6 +130,7 @@ class onManualDriving
 
         void entry(void) override {
             onRunningMode::entry();
+            ri->initStats();
         };
 
         void react (AutonomousDrivingEvent const & e) override {
@@ -148,6 +159,7 @@ class onAutonomousDriving
 
         virtual void entry(void) { 
             onRunningMode::entry();
+            ri->initStats();
         };  
 
         virtual void react(IdleStatusEvent                 const & e) override { 
@@ -217,13 +229,14 @@ void RosInterface::updateParam() {
 
 void RosInterface::initSub () {
     sub_image_and_camera = it->subscribeCamera("/front_video_resize/image", 2, &RosInterface::callbackWithCameraInfo, this);
-    tof1_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof1", 1, &RosInterface::tof1_msg_cb, this);
-    tof2_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof2", 1, &RosInterface::tof2_msg_cb, this);
-    state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 1, &RosInterface::state_msg_cb, this);
+    tof1_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof1", 2, &RosInterface::tof1_msg_cb, this);
+    tof2_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof2", 2, &RosInterface::tof2_msg_cb, this);
+    state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 2, &RosInterface::state_msg_cb, this);
 }
 void RosInterface::initPub() {
         autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 10);
         autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 10);
+        stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 10);
 }
 
 static uint32_t lastTof1Value;
@@ -233,6 +246,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
     static uint32_t lastSeq = 0;
 
     if (image_msg->header.seq != (lastSeq+1)) {
+        updateStats(1, image_msg->header.seq-(lastSeq+1));
         ROS_INFO("Image topic seq issue, expected : %d, got %d", lastSeq+1, image_msg->header.seq);
     }
     lastSeq = image_msg->header.seq;
@@ -268,6 +282,29 @@ void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::Const
     }    
 }
 
+void RosInterface::initStats(void) {
+    totalImages=0;
+    missedImages=0;
+}
+
+void RosInterface::updateStats(uint32_t received, uint32_t missed) {
+    totalImages+=received;
+    missedImages+=missed;
+}
+
+void RosInterface::reportStats(void) {
+
+    robocars_autopilot::robocars_autopilot_stats statsMsg;
+
+    statsMsg.header.stamp = ros::Time::now();
+    statsMsg.header.seq=1;
+    statsMsg.header.frame_id = "stats";
+    statsMsg.totalImages = totalImages;
+    statsMsg.missedImages = missedImages;
+
+    stats_pub.publish(statsMsg);
+
+}
 
 int main(int argc, char **argv)
 {
