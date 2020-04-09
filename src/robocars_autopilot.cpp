@@ -231,9 +231,9 @@ void RosInterface::initSub () {
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 2, &RosInterface::state_msg_cb, this);
 }
 void RosInterface::initPub() {
-        autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 10);
-        autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 10);
-        stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 10);
+    autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 10);
+    autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 10);
+    stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 10);
 }
 
 static uint32_t lastTof1Value;
@@ -242,10 +242,7 @@ static uint32_t lastTof2Value;
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
     static uint32_t lastSeq = 0;
 
-    if (image_msg->header.seq != (lastSeq+1)) {
-        updateStats(1, image_msg->header.seq-(lastSeq+1));
-        ROS_INFO("Image topic seq issue, expected : %d, got %d", lastSeq+1, image_msg->header.seq);
-    }
+    updateStats(1, image_msg->header.seq-(lastSeq+1));
     lastSeq = image_msg->header.seq;
     static _Float32 fake_steering_value = -1.0;
     send_event(PredictEvent(fake_steering_value,0.0));
