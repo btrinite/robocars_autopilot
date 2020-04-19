@@ -72,14 +72,6 @@ class RosInterface
             initParam();
             updateParam();
             it = new image_transport::ImageTransport(node_);
-            tensorflow::SessionOptions options = tensorflow::SessionOptions();
-            options.config.mutable_gpu_options()->set_allow_growth(true);
-            tfstatus = tensorflow::NewSession(options, &tfsession);
-            if (!tfstatus.ok()) {
-                ROS_WARN("Autopilot: TF Session initialization failed (%s)", tfstatus.ToString().c_str());
-            } else {
-                ROS_INFO("Autopilot: TF Session initialized");
-            }
         };
 
 
@@ -115,10 +107,6 @@ class RosInterface
 
         ros::ServiceServer reloadModel_svc;
 
-        tensorflow::Session* tfsession;
-        tensorflow::GraphDef graph_def;
-        tensorflow::Status tfstatus;
-        tensorflow::TensorShape tfshape = tensorflow::TensorShape();
         bool modelLoaded=false;
 
         // stats

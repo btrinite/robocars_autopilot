@@ -20,10 +20,6 @@
 #include <date.h>
 #include <json.hpp>
 
-#include <vector>
-
-#include <opencv2/opencv.hpp>
-#include <cv_bridge/cv_bridge.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -43,12 +39,6 @@
 #include <robocars_autopilot/robocars_autopilot_stats.h>
 
 #include <robocars_autopilot.hpp>
-
-using tensorflow::Flag;
-using tensorflow::Tensor;
-using tensorflow::Status;
-using tensorflow::string;
-using tensorflow::int32;
 
 
 RosInterface * ri;
@@ -253,24 +243,13 @@ static uint32_t lastTof1Value;
 static uint32_t lastTof2Value;
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
     static uint32_t lastSeq = 0;
-    cv_bridge::CvImagePtr cv_ptr;
 
-    tensorflow::Tensor tensor;
     if (updateStats(1, image_msg->header.seq-(lastSeq+1))) {
         ROS_WARN ("Autopilot: Losing images");
     };
     lastSeq = image_msg->header.seq;
 
     if (modelLoaded) {
-        try
-        {
-            cv_ptr = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::RGB8); //for tensorflow, using RGB8
-        }
-        catch (cv_bridge::Exception& e)
-        {
-            ROS_ERROR_STREAM("cv_bridge exception: " << e.what());
-            return;
-        }
     }
 
     static _Float32 fake_steering_value = -1.0;
@@ -308,26 +287,8 @@ void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::Const
 bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
     updateParam();
     modelLoaded = false;
-    tfstatus = ReadBinaryProto(tensorflow::Env::Default(), model_path+"/"+model_filename, &graph_def);
-    if (!tfstatus.ok()) {
-        ROS_WARN("Autopilot: TF model loading failed (%s)", tfstatus.ToString().c_str());
-    } else {
-        ROS_INFO("Autopilot: TF model loaded");
-    }
-    // Add the graph to the session
-    tfstatus = tfsession->Create(graph_def);
-    if (!tfstatus.ok()) {
-        ROS_WARN("Autopilot: building graph failed (%s)", tfstatus.ToString().c_str());
-    } else {
-        ROS_INFO("Autopilot: TF grah build");
-    }
 
-    tfshape.AddDim(1);
-    tfshape.AddDim((int64_t)120);
-    tfshape.AddDim((int64_t)160);
-    tfshape.AddDim(3);
     modelLoaded = true;
-
     return true;
 }
 
