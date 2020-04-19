@@ -20,8 +20,10 @@
 #include <date.h>
 #include <json.hpp>
 
-#include "tensorflow/core/public/session.h"
-#include "tensorflow/core/platform/env.h"
+#include <vector>
+
+#include <opencv2/opencv.hpp>
+#include <cv_bridge/cv_bridge.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -32,6 +34,7 @@
 
 #include <image_transport/image_transport.h>
 
+#include <std_srvs/Empty.h>
 
 #include <robocars_msgs/robocars_brain_state.h>
 #include <robocars_msgs/robocars_tof.h>
@@ -41,11 +44,19 @@
 
 #include <robocars_autopilot.hpp>
 
+using tensorflow::Flag;
+using tensorflow::Tensor;
+using tensorflow::Status;
+using tensorflow::string;
+using tensorflow::int32;
+
+
 RosInterface * ri;
 
 // Paran
 static int loop_hz;
 static std::string model_filename;
+static std::string model_path;
 
 class onRunningMode;
 class onIdle;
@@ -215,11 +226,12 @@ void RosInterface::initParam() {
         node_.setParam ("loop_hz", 60);       
     }
     if (!node_.hasParam("model_filename")) {
-        node_.setParam("model_filename",  std::string("modelcat"));
+        node_.setParam("model_filename",  std::string("modelcat.pb"));
     }
 }
 void RosInterface::updateParam() {
     node_.getParam("loop_hz", loop_hz);
+    node_.getParam("model_path", model_path);
     node_.getParam("model_filename", model_filename);
 }
 
@@ -229,6 +241,7 @@ void RosInterface::initSub () {
     tof1_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof1", 2, &RosInterface::tof1_msg_cb, this);
     tof2_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof2", 2, &RosInterface::tof2_msg_cb, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 2, &RosInterface::state_msg_cb, this);
+    reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
 }
 void RosInterface::initPub() {
     autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 10);
@@ -238,14 +251,28 @@ void RosInterface::initPub() {
 
 static uint32_t lastTof1Value;
 static uint32_t lastTof2Value;
-
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
     static uint32_t lastSeq = 0;
-    
+    cv_bridge::CvImagePtr cv_ptr;
+
+    tensorflow::Tensor tensor;
     if (updateStats(1, image_msg->header.seq-(lastSeq+1))) {
         ROS_WARN ("Autopilot: Losing images");
     };
     lastSeq = image_msg->header.seq;
+
+    if (modelLoaded) {
+        try
+        {
+            cv_ptr = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::RGB8); //for tensorflow, using RGB8
+        }
+        catch (cv_bridge::Exception& e)
+        {
+            ROS_ERROR_STREAM("cv_bridge exception: " << e.what());
+            return;
+        }
+    }
+
     static _Float32 fake_steering_value = -1.0;
     send_event(PredictEvent(fake_steering_value,0.0));
     fake_steering_value = fake_steering_value + 0.1;
@@ -276,6 +303,32 @@ void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::Const
         }
         last_state=msg->state;
     }    
+}
+
+bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    updateParam();
+    modelLoaded = false;
+    tfstatus = ReadBinaryProto(tensorflow::Env::Default(), model_path+"/"+model_filename, &graph_def);
+    if (!tfstatus.ok()) {
+        ROS_WARN("Autopilot: TF model loading failed (%s)", tfstatus.ToString().c_str());
+    } else {
+        ROS_INFO("Autopilot: TF model loaded");
+    }
+    // Add the graph to the session
+    tfstatus = tfsession->Create(graph_def);
+    if (!tfstatus.ok()) {
+        ROS_WARN("Autopilot: building graph failed (%s)", tfstatus.ToString().c_str());
+    } else {
+        ROS_INFO("Autopilot: TF grah build");
+    }
+
+    tfshape.AddDim(1);
+    tfshape.AddDim((int64_t)120);
+    tfshape.AddDim((int64_t)160);
+    tfshape.AddDim(3);
+    modelLoaded = true;
+
+    return true;
 }
 
 void RosInterface::initStats(void) {

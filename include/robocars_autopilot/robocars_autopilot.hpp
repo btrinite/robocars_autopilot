@@ -74,9 +74,9 @@ class RosInterface
             it = new image_transport::ImageTransport(node_);
             tensorflow::SessionOptions options = tensorflow::SessionOptions();
             options.config.mutable_gpu_options()->set_allow_growth(true);
-            tensorflow::Status status = tensorflow::NewSession(options, &session);
-            if (!status.ok()) {
-
+            tfstatus = tensorflow::NewSession(options, &tfsession);
+            if (!tfstatus.ok()) {
+                ROS_WARN("Autopilot: TF Session initialization failed (%s)", tfstatus.ToString().c_str());
             } else {
                 ROS_INFO("Autopilot: TF Session initialized");
             }
@@ -106,14 +106,20 @@ class RosInterface
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
         void tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg);
         void tof2_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg);
+        bool reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
         ros::Subscriber tof1_sub;
         ros::Subscriber tof2_sub;
         image_transport::ImageTransport * it;
         image_transport::CameraSubscriber sub_image_and_camera;
 
-        tensorflow::Session* session;
+        ros::ServiceServer reloadModel_svc;
+
+        tensorflow::Session* tfsession;
         tensorflow::GraphDef graph_def;
+        tensorflow::Status tfstatus;
+        tensorflow::TensorShape tfshape = tensorflow::TensorShape();
+        bool modelLoaded=false;
 
         // stats
         uint32_t totalImages=0;
