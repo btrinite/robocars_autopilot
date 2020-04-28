@@ -14,6 +14,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fstream>
+#include <vector>
+#include <queue>
 
 #include <boost/format.hpp>
 
@@ -29,6 +31,7 @@
 #include <sensor_msgs/CameraInfo.h>
 
 #include <image_transport/image_transport.h>
+#include <cv_bridge/cv_bridge.h>
 
 #include <std_srvs/Empty.h>
 
@@ -36,10 +39,19 @@
 #include <robocars_msgs/robocars_tof.h>
 #include <robocars_msgs/robocars_autopilot_output.h>
 
+
+#include "tensorflow/lite/model.h"
+#include "tensorflow/lite/string_type.h"
+#include "absl/memory/memory.h"
+#include "tensorflow/lite/builtin_op_data.h"
+#include "tensorflow/lite/kernels/register.h"
+#include "tensorflow/lite/optional_debug_tools.h"
+#include "tensorflow/lite/profiling/profiler.h"
+#include "tensorflow/lite/string_util.h"
+#include "tensorflow/lite/tools/evaluation/utils.h"
+
 #include <robocars_autopilot/robocars_autopilot_stats.h>
-
 #include <robocars_autopilot.hpp>
-
 
 RosInterface * ri;
 
@@ -241,8 +253,130 @@ void RosInterface::initPub() {
 
 static uint32_t lastTof1Value;
 static uint32_t lastTof2Value;
+
+
+template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
+            int image_channels, int wanted_height, int wanted_width,
+            int wanted_channels) {
+  int number_of_pixels = image_height * image_width * image_channels;
+  std::unique_ptr<tflite::Interpreter> interpreter(new tflite::Interpreter);
+
+  int base_index = 0;
+
+  // two inputs: input and new_sizes
+  interpreter->AddTensors(2, &base_index);
+  // one output
+  interpreter->AddTensors(1, &base_index);
+  // set input and output tensors
+  interpreter->SetInputs({0, 1});
+  interpreter->SetOutputs({2});
+
+  // set parameters of tensors
+  TfLiteQuantizationParams quant;
+  interpreter->SetTensorParametersReadWrite(
+      0, kTfLiteFloat32, "input",
+      {1, image_height, image_width, image_channels}, quant);
+  interpreter->SetTensorParametersReadWrite(1, kTfLiteInt32, "new_size", {2},
+                                            quant);
+  interpreter->SetTensorParametersReadWrite(
+      2, kTfLiteFloat32, "output",
+      {1, wanted_height, wanted_width, wanted_channels}, quant);
+
+  tflite::ops::builtin::BuiltinOpResolver resolver;
+  const TfLiteRegistration* resize_op =
+      resolver.FindOp(tflite::BuiltinOperator_RESIZE_BILINEAR, 1);
+  auto* params = reinterpret_cast<TfLiteResizeBilinearParams*>(
+      malloc(sizeof(TfLiteResizeBilinearParams)));
+  params->align_corners = false;
+  params->half_pixel_centers = false;
+  interpreter->AddNodeWithParameters({0, 1}, {2}, nullptr, 0, params, resize_op,
+                                     nullptr);
+
+  interpreter->AllocateTensors();
+
+  // fill input image
+  // in[] are integers, cannot do memcpy() directly
+  auto input = interpreter->typed_tensor<float>(0);
+  for (int i = 0; i < number_of_pixels; i++) {
+    input[i] = in[i];
+  }
+
+  // fill new_sizes
+  interpreter->typed_tensor<int>(1)[0] = wanted_height;
+  interpreter->typed_tensor<int>(1)[1] = wanted_width;
+
+  interpreter->Invoke();
+
+  auto output = interpreter->typed_tensor<float>(2);
+  auto output_number_of_pixels = wanted_height * wanted_width * wanted_channels;
+
+  for (int i = 0; i < output_number_of_pixels; i++) {
+    switch (model_input_type) {
+      case kTfLiteFloat32:
+        out[i] = output[i];
+        break;
+      case kTfLiteInt8:
+        out[i] = static_cast<int8_t>(output[i] - 128);
+        break;
+      case kTfLiteUInt8:
+        out[i] = static_cast<uint8_t>(output[i]);
+        break;
+      default:
+        break;
+    }
+  }
+}
+
+template <class T> void RosInterface::get_top_n(T* prediction, int prediction_size, size_t num_results,
+               float threshold, std::vector<std::pair<float, int>>* top_results,
+               TfLiteType input_type) {
+  // Will contain top N results in ascending order.
+  std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>>,
+                      std::greater<std::pair<float, int>>>
+      top_result_pq;
+
+  const long count = prediction_size;  // NOLINT(runtime/int)
+  float value = 0.0;
+
+  for (int i = 0; i < count; ++i) {
+    switch (input_type) {
+      case kTfLiteFloat32:
+        value = prediction[i];
+        break;
+      case kTfLiteInt8:
+        value = (prediction[i] + 128) / 256.0;
+        break;
+      case kTfLiteUInt8:
+        value = prediction[i] / 255.0;
+        break;
+      default:
+        break;
+    }
+    // Only add it if it beats the threshold and has a chance at being in
+    // the top N.
+    if (value < threshold) {
+      continue;
+    }
+
+    top_result_pq.push(std::pair<float, int>(value, i));
+
+    // If at capacity, kick the smallest value out.
+    if (top_result_pq.size() > num_results) {
+      top_result_pq.pop();
+    }
+  }
+
+  // Copy to output vector and reverse into descending order.
+  while (!top_result_pq.empty()) {
+    top_results->push_back(top_result_pq.top());
+    top_result_pq.pop();
+  }
+  std::reverse(top_results->begin(), top_results->end());
+}
+
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
     static uint32_t lastSeq = 0;
+    cv_bridge::CvImagePtr cv_ptr;
 
     if (updateStats(1, image_msg->header.seq-(lastSeq+1))) {
         ROS_WARN ("Autopilot: Losing images");
@@ -250,6 +384,64 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
     lastSeq = image_msg->header.seq;
 
     if (modelLoaded) {
+        int image_width = 160;
+        int image_height = 120;
+        int image_channels = 3; 
+        try {   
+            cv_ptr = cv_bridge::toCvCopy(image_msg, sensor_msgs::image_encodings::RGB8); //for tensorflow, using RGB8
+        }
+        catch (cv_bridge::Exception& e) {
+            ROS_ERROR_STREAM("cv_bridge exception: " << e.what());
+            return;
+        }
+        std::vector<uint8_t> in(cv_ptr->image.begin<uint8_t>(), cv_ptr->image.end<uint8_t>());
+
+        const std::vector<int> inputs = interpreter->inputs();
+        const std::vector<int> outputs = interpreter->outputs();
+        switch (model_input_type) {
+            case kTfLiteFloat32:
+                resize<float>(interpreter->typed_tensor<float>(input), in.data(),
+                    image_height, image_width, image_channels, wanted_height,
+                    wanted_width, wanted_channels);
+            break;
+            case kTfLiteInt8:
+                resize<int8_t>(interpreter->typed_tensor<int8_t>(input), in.data(),
+                     image_height, image_width, image_channels, wanted_height,
+                     wanted_width, wanted_channels);
+            break;
+            case kTfLiteUInt8:
+                resize<uint8_t>(interpreter->typed_tensor<uint8_t>(input), in.data(),
+                      image_height, image_width, image_channels, wanted_height,
+                      wanted_width, wanted_channels);
+            break;
+        }
+        interpreter->Invoke();
+        std::vector<std::pair<float, int>> top_results;
+
+        const float threshold = 0.001f;
+
+        switch (interpreter->tensor(output_steering)->type) {
+            case kTfLiteFloat32:
+                get_top_n<float>(interpreter->typed_output_tensor<float>(0), output_steering_size,
+                       1, threshold, &top_results,
+                       model_input_type);
+            break;    
+            case kTfLiteInt8:
+                get_top_n<int8_t>(interpreter->typed_output_tensor<int8_t>(0),
+                        output_steering_size, 1, threshold,
+                        &top_results, model_input_type);
+                break;
+            case kTfLiteUInt8:
+                get_top_n<uint8_t>(interpreter->typed_output_tensor<uint8_t>(0),
+                         output_steering_size, 1, threshold,
+                         &top_results, model_input_type);
+            break;
+         }
+        for (const auto& result : top_results) {
+            const float confidence = result.first;
+            const int index = result.second;
+            ROS_INFO("Steering inference result : confidence %f index %d", confidence, index);
+        }
     }
 
     static _Float32 fake_steering_value = -1.0;
@@ -287,8 +479,60 @@ void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::Const
 bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
     updateParam();
     modelLoaded = false;
+    model = tflite::FlatBufferModel::BuildFromFile((model_path+"/"+model_filename).c_str());
+    if (model) {
+        ROS_INFO("Model loaded %s", (model_path+"/"+model_filename).c_str());
+        model->error_reporter();
+        ROS_INFO("Resolved reporter");
+        tflite::InterpreterBuilder(*model, resolver)(&interpreter);
+        if (!interpreter) {
+            ROS_INFO("Failed to construct interpreter");
+        } else {
+            interpreter->UseNNAPI(0);
+            interpreter->SetAllowFp16PrecisionForFp32(0);
+            ROS_INFO("tensors size: %ld", interpreter->tensors_size());
+            ROS_INFO("nodes size: %ld", interpreter->nodes_size());
+            ROS_INFO("inputs: %ld", interpreter->inputs().size());
+            ROS_INFO("input(0) name: %s", interpreter->GetInputName(0));
 
-    modelLoaded = true;
+            interpreter->SetNumThreads(4);
+
+            input = interpreter->inputs()[0];
+
+            TfLiteIntArray* dims = interpreter->tensor(input)->dims;
+            wanted_height = dims->data[1];
+            wanted_width = dims->data[2];
+            wanted_channels = dims->data[3];
+            model_input_type = interpreter->tensor(input)->type;
+            ROS_INFO("wanted_height: %d", wanted_height);
+            ROS_INFO("wanted_width: %d", wanted_width);
+            ROS_INFO("wanted_channels: %d", wanted_channels);
+            ROS_INFO("Input Type : %d", model_input_type);
+            
+            if ((model_input_type != kTfLiteFloat32) && (model_input_type != kTfLiteInt8) && (model_input_type!= kTfLiteUInt8)) {
+                ROS_INFO("cannot handle input type %d", interpreter->tensor(input)->type);
+            }
+
+            if (interpreter->AllocateTensors() != kTfLiteOk) {
+                ROS_INFO("Failed to allocate tensors!");
+            }
+
+            output_steering = interpreter->outputs()[0];
+            TfLiteIntArray* output_dims = interpreter->tensor(output_steering)->dims;
+            output_steering_size = output_dims->data[output_dims->size - 1];
+            ROS_INFO("Output Steering Size : %d", output_steering_size);
+
+            output_throttling = interpreter->outputs()[1];
+            output_dims = interpreter->tensor(output_throttling)->dims;
+            output_throttling_size = output_dims->data[output_dims->size - 1];
+            ROS_INFO("Output Throttling Size : %d", output_throttling_size);
+
+            modelLoaded = true;
+        }
+    } else {
+        ROS_INFO("Failed to mmap model %s", (model_path+"/"+model_filename).c_str());
+    }
+
     return true;
 }
 

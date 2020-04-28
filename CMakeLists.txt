@@ -14,6 +14,7 @@ find_package(catkin REQUIRED COMPONENTS
   image_transport
   tensorflow_ros_cpp
   message_generation
+  cv_bridge  
 )
 
 ## System dependencies are found with CMake's conventions
@@ -129,6 +130,9 @@ include_directories(
 #include
   ${catkin_INCLUDE_DIRS}
   include/robocars_autopilot
+  $ENV{ROBOCARS_TFLITE_INCLUDE}
+  $ENV{ROBOCARS_TFLITE_INCLUDE}/tensorflow/lite/tools/make/downloads/flatbuffers/include
+  $ENV{ROBOCARS_TFLITE_INCLUDE}/tensorflow/lite/tools/make/downloads/absl
 )
 
 
@@ -163,6 +167,7 @@ add_dependencies(robocars_autopilot ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin
 
 target_link_libraries(robocars_autopilot
   ${catkin_LIBRARIES}
+  $ENV{ROBOCARS_TFLITE_STATICLIB}
 )
 #############
 ## Install ##

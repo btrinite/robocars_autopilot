@@ -86,6 +86,7 @@ class RosInterface
         void initStats();
         void reportStats();
         bool updateStats(uint32_t received, uint32_t missed);
+
     private:
         void state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg);
 
@@ -99,13 +100,31 @@ class RosInterface
         void tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg);
         void tof2_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg);
         bool reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
-
+        
+        template <class T> void resize (T* out, uint8_t* in, int image_height, int image_width,
+            int image_channels, int wanted_height, int wanted_width,
+            int wanted_channels);
+        template <class T> void get_top_n(T* prediction, int prediction_size, size_t num_results,
+               float threshold, std::vector<std::pair<float, int>>* top_results,
+               TfLiteType input_type);
         ros::Subscriber tof1_sub;
         ros::Subscriber tof2_sub;
         image_transport::ImageTransport * it;
         image_transport::CameraSubscriber sub_image_and_camera;
 
         ros::ServiceServer reloadModel_svc;
+        std::unique_ptr<tflite::FlatBufferModel> model;
+        std::unique_ptr<tflite::Interpreter> interpreter;
+        tflite::ops::builtin::BuiltinOpResolver resolver;
+        int input;
+        int output_steering;
+        int output_throttling;
+        int wanted_height;
+        int wanted_width;
+        int wanted_channels;
+        TfLiteType model_input_type;
+        int output_steering_size;
+        int output_throttling_size;
 
         bool modelLoaded=false;
 
