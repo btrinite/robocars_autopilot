@@ -12,7 +12,6 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   robocars_msgs
   image_transport
-  tensorflow_ros_cpp
   message_generation
   cv_bridge  
 )
