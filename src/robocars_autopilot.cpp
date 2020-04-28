@@ -219,7 +219,7 @@ void RosInterface::publishPredict(_Float32 steering, _Float32 throttling) {
     throttlingMsg.header.stamp = ros::Time::now();
     throttlingMsg.header.seq=1;
     throttlingMsg.header.frame_id = "pilotSteering";
-    throttlingMsg.norm = steering;
+    throttlingMsg.norm = throttling;
 
     autopilot_throttling_pub.publish(throttlingMsg);
 }
@@ -232,7 +232,7 @@ void RosInterface::initParam() {
         node_.setParam("model_filename",  std::string("modelcat.pb"));
     }
     if (!node_.hasParam("fix_autopilot_throttle_value")) {
-        node_.setParam("fix_autopilot_throttle_value",0.2);
+        node_.setParam("fix_autopilot_throttle_value",0.35);
     }
 }
 void RosInterface::updateParam() {
