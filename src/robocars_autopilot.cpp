@@ -59,7 +59,7 @@ RosInterface * ri;
 static int loop_hz;
 static std::string model_filename;
 static std::string model_path;
-static int throttling_fixed_value;
+static float throttling_fixed_value;
 
 class onRunningMode;
 class onIdle;
@@ -91,6 +91,7 @@ class onRunningMode
         };
 
         void react( PredictEvent const & e) override { 
+            ri->publishPredict(e.steering_value, e.throttling_value);
             RobocarsStateMachine::react(e);
         };
 
@@ -184,7 +185,6 @@ class onAutonomousDriving
         };
 
         void react( PredictEvent const & e) override { 
-            ri->publishPredict(e.steering_value, e.throttling_value);
             onRunningMode::react(e);
         };
 
