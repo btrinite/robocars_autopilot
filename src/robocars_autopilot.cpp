@@ -59,6 +59,7 @@ RosInterface * ri;
 static int loop_hz;
 static std::string model_filename;
 static std::string model_path;
+static int throttling_fixed_value;
 
 class onRunningMode;
 class onIdle;
@@ -230,11 +231,15 @@ void RosInterface::initParam() {
     if (!node_.hasParam("model_filename")) {
         node_.setParam("model_filename",  std::string("modelcat.pb"));
     }
+    if (!node_.hasParam("fix_autopilot_throttle_value")) {
+        node_.setParam("fix_autopilot_throttle_value",0.2);
+    }
 }
 void RosInterface::updateParam() {
     node_.getParam("loop_hz", loop_hz);
     node_.getParam("model_path", model_path);
     node_.getParam("model_filename", model_filename);
+    node_.getParam("fix_autopilot_throttle_value", throttling_fixed_value);
 }
 
 
@@ -327,51 +332,43 @@ template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_heig
   }
 }
 
-template <class T> void RosInterface::get_top_n(T* prediction, int prediction_size, size_t num_results,
-               float threshold, std::vector<std::pair<float, int>>* top_results,
+float linear_unbin(int idx, int N=15, float offset=-1, float R=2.0) { 
+    return (float) ((float)idx *(R/((float)N + offset)) + offset);
+}
+
+template <class T> float RosInterface::unbind(T* prediction, int prediction_size, size_t num_results,
+               float threshold,
                TfLiteType input_type) {
   // Will contain top N results in ascending order.
-  std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>>,
+    std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>>,
                       std::greater<std::pair<float, int>>>
-      top_result_pq;
+    top_result_pq;
 
-  const long count = prediction_size;  // NOLINT(runtime/int)
-  float value = 0.0;
-
-  for (int i = 0; i < count; ++i) {
-    switch (input_type) {
-      case kTfLiteFloat32:
-        value = prediction[i];
-        break;
-      case kTfLiteInt8:
-        value = (prediction[i] + 128) / 256.0;
-        break;
-      case kTfLiteUInt8:
-        value = prediction[i] / 255.0;
-        break;
-      default:
-        break;
+    const long count = prediction_size;  // NOLINT(runtime/int)
+    float a, maxa = -1, res;
+    int idx=-1;
+    for (int i = 0; i < count; ++i) {
+        switch (input_type) {    
+            case kTfLiteFloat32:
+            a = prediction[i];
+            break;
+            case kTfLiteInt8:
+            a = (prediction[i] + 128) / 256.0;
+            break;
+            case kTfLiteUInt8:
+            a = prediction[i] / 255.0;;
+            break;
+            default:
+            break;
+        }
+        if (a>maxa) { maxa = a; idx=i;}
+    }   
+    if (count>1) {
+        res=linear_unbin(idx, prediction_size, -1, 2);
+    } else {
+        res=maxa;
     }
-    // Only add it if it beats the threshold and has a chance at being in
-    // the top N.
-    if (value < threshold) {
-      continue;
-    }
-
-    top_result_pq.push(std::pair<float, int>(value, i));
-
-    // If at capacity, kick the smallest value out.
-    if (top_result_pq.size() > num_results) {
-      top_result_pq.pop();
-    }
-  }
-
-  // Copy to output vector and reverse into descending order.
-  while (!top_result_pq.empty()) {
-    top_results->push_back(top_result_pq.top());
-    top_result_pq.pop();
-  }
-  std::reverse(top_results->begin(), top_results->end());
+    return res;
 }
 
 void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info) {
@@ -406,48 +403,41 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             break;
             case kTfLiteInt8:
                 resize<int8_t>(interpreter->typed_tensor<int8_t>(input), in.data(),
-                     image_height, image_width, image_channels, wanted_height,
-                     wanted_width, wanted_channels);
+                    image_height, image_width, image_channels, wanted_height,
+                    wanted_width, wanted_channels);
             break;
             case kTfLiteUInt8:
                 resize<uint8_t>(interpreter->typed_tensor<uint8_t>(input), in.data(),
-                      image_height, image_width, image_channels, wanted_height,
-                      wanted_width, wanted_channels);
+                    image_height, image_width, image_channels, wanted_height,
+                    wanted_width, wanted_channels);
             break;
         }
         interpreter->Invoke();
-        std::vector<std::pair<float, int>> top_results;
 
         const float threshold = 0.001f;
-
+        float predicted_Steering;
         switch (interpreter->tensor(output_steering)->type) {
             case kTfLiteFloat32:
-                get_top_n<float>(interpreter->typed_output_tensor<float>(0), output_steering_size,
-                       1, threshold, &top_results,
-                       model_input_type);
+                predicted_Steering = unbind<float>(interpreter->typed_output_tensor<float>(0), output_steering_size,
+                    1, threshold,
+                    model_input_type);
             break;    
             case kTfLiteInt8:
-                get_top_n<int8_t>(interpreter->typed_output_tensor<int8_t>(0),
+                predicted_Steering = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(0),
                         output_steering_size, 1, threshold,
-                        &top_results, model_input_type);
+                        model_input_type);
                 break;
             case kTfLiteUInt8:
-                get_top_n<uint8_t>(interpreter->typed_output_tensor<uint8_t>(0),
-                         output_steering_size, 1, threshold,
-                         &top_results, model_input_type);
+                predicted_Steering = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(0),
+                        output_steering_size, 1, threshold,
+                        model_input_type);
             break;
-         }
-        for (const auto& result : top_results) {
-            const float confidence = result.first;
-            const int index = result.second;
-            ROS_INFO("Steering inference result : confidence %f index %d", confidence, index);
         }
+        ROS_INFO ("Autopilot: steering predict value = %f", predicted_Steering);
+        send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
+    } else {
+        send_event(PredictEvent(0,0));
     }
-
-    static _Float32 fake_steering_value = -1.0;
-    send_event(PredictEvent(fake_steering_value,0.0));
-    fake_steering_value = fake_steering_value + 0.1;
-    if (fake_steering_value>1.1) {fake_steering_value = -1.0;}
 }
 
 void RosInterface::tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg){

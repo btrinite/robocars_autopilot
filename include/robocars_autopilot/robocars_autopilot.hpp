@@ -104,9 +104,8 @@ class RosInterface
         template <class T> void resize (T* out, uint8_t* in, int image_height, int image_width,
             int image_channels, int wanted_height, int wanted_width,
             int wanted_channels);
-        template <class T> void get_top_n(T* prediction, int prediction_size, size_t num_results,
-               float threshold, std::vector<std::pair<float, int>>* top_results,
-               TfLiteType input_type);
+        template <class T> float unbind(T* prediction, int prediction_size, size_t num_results,
+               float threshold, TfLiteType input_type);
         ros::Subscriber tof1_sub;
         ros::Subscriber tof2_sub;
         image_transport::ImageTransport * it;
