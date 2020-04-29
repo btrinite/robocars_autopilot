@@ -391,7 +391,16 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             ROS_ERROR_STREAM("cv_bridge exception: " << e.what());
             return;
         }
-        std::vector<uint8_t> in(cv_ptr->image.begin<uint8_t>(), cv_ptr->image.end<uint8_t>());
+        cv::cvtColor(cv_ptr->image, cv_ptr->image, cv::COLOR_BGR2RGB);
+
+        std::vector<uchar> in;
+        if (cv_ptr->image.isContinuous()) {
+            // array.assign(mat.datastart, mat.dataend); // <- has problems for sub-matrix like mat = big_mat.row(i)
+            in.assign(cv_ptr->image.data, cv_ptr->image.data + (cv_ptr->image.total()*cv_ptr->image.channels()));
+        } else {
+            ROS_ERROR_STREAM("Unable to convert image: ");
+            return;
+        }
 
         const std::vector<int> inputs = interpreter->inputs();
         const std::vector<int> outputs = interpreter->outputs();
