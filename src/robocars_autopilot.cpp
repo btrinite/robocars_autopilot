@@ -337,7 +337,6 @@ float linear_unbin(int idx, int N=15, float offset=-1, float R=2.0) {
 }
 
 template <class T> float RosInterface::unbind(T* prediction, int prediction_size, size_t num_results,
-               float threshold,
                TfLiteType input_type) {
   // Will contain top N results in ascending order.
     std::priority_queue<std::pair<float, int>, std::vector<std::pair<float, int>>,
@@ -423,26 +422,21 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
         }
         interpreter->Invoke();
 
-        const float threshold = 0.001f;
         float predicted_Steering;
         switch (interpreter->tensor(output_steering)->type) {
             case kTfLiteFloat32:
                 predicted_Steering = unbind<float>(interpreter->typed_output_tensor<float>(0), output_steering_size,
-                    1, threshold,
-                    model_input_type);
+                    1, model_input_type);
             break;    
             case kTfLiteInt8:
                 predicted_Steering = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(0),
-                        output_steering_size, 1, threshold,
-                        model_input_type);
+                        output_steering_size, 1, model_input_type);
                 break;
             case kTfLiteUInt8:
                 predicted_Steering = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(0),
-                        output_steering_size, 1, threshold,
-                        model_input_type);
+                        output_steering_size, 1, model_input_type);
             break;
         }
-        ROS_INFO ("Autopilot: steering predict value = %f", predicted_Steering);
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
         send_event(PredictEvent(0,0));
