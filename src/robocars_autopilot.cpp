@@ -391,8 +391,6 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             return;
         }
 
-        cv::cvtColor(cv_ptr->image, cv_ptr->image, cv::COLOR_BGR2RGB);
-
         std::vector<uchar> in;
         if (cv_ptr->image.isContinuous()) {
             // array.assign(mat.datastart, mat.dataend); // <- has problems for sub-matrix like mat = big_mat.row(i)
