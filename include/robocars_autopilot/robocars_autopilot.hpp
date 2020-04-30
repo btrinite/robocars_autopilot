@@ -105,7 +105,7 @@ class RosInterface
             int image_channels, int wanted_height, int wanted_width,
             int wanted_channels);
         template <class T> float unbind(T* prediction, int prediction_size, size_t num_results,
-               float threshold, TfLiteType input_type);
+               TfLiteType input_type);
         ros::Subscriber tof1_sub;
         ros::Subscriber tof2_sub;
         image_transport::ImageTransport * it;

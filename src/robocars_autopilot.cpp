@@ -390,6 +390,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             ROS_ERROR_STREAM("cv_bridge exception: " << e.what());
             return;
         }
+
         cv::cvtColor(cv_ptr->image, cv_ptr->image, cv::COLOR_BGR2RGB);
 
         std::vector<uchar> in;
