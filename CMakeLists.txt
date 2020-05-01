@@ -167,7 +167,9 @@ add_dependencies(robocars_autopilot ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin
 target_link_libraries(robocars_autopilot
   ${catkin_LIBRARIES}
   $ENV{ROBOCARS_TFLITE_STATICLIB}
+  $ENV{ROBOCARS_EDGETPU_LIB}
 )
+
 #############
 ## Install ##
 #############

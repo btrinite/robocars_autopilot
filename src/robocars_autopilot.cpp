@@ -39,6 +39,7 @@
 #include <robocars_msgs/robocars_tof.h>
 #include <robocars_msgs/robocars_autopilot_output.h>
 
+#include "edgetpu.h"
 
 #include "tensorflow/lite/model.h"
 #include "tensorflow/lite/string_type.h"
@@ -60,6 +61,8 @@ static int loop_hz;
 static std::string model_filename;
 static std::string model_path;
 static float throttling_fixed_value;
+
+bool edgetpu_found = false;
 
 class onRunningMode;
 class onIdle;
@@ -468,6 +471,38 @@ void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::Const
     }    
 }
 
+std::unique_ptr<tflite::Interpreter> BuildEdgeTpuInterpreter(
+    const tflite::FlatBufferModel& model,
+    edgetpu::EdgeTpuContext* edgetpu_context) {
+  tflite::ops::builtin::BuiltinOpResolver resolver;
+  resolver.AddCustom(edgetpu::kCustomOp, edgetpu::RegisterCustomOp());
+  std::unique_ptr<tflite::Interpreter> interpreter;
+  if (tflite::InterpreterBuilder(model, resolver)(&interpreter) != kTfLiteOk) {
+    ROS_INFO ("Failed to build interpreter.");
+  }
+  // Bind given context with interpreter.
+  interpreter->SetExternalContext(kTfLiteEdgeTpuContext, edgetpu_context);
+  interpreter->SetNumThreads(1);
+  if (interpreter->AllocateTensors() != kTfLiteOk) {
+    ROS_INFO("Failed to allocate tensors.");
+  }
+  return interpreter;
+}
+
+std::unique_ptr<tflite::Interpreter> BuildLocalInterpreter(
+    const tflite::FlatBufferModel& model) {
+  tflite::ops::builtin::BuiltinOpResolver resolver;
+  std::unique_ptr<tflite::Interpreter> interpreter;
+  if (tflite::InterpreterBuilder(model, resolver)(&interpreter) != kTfLiteOk) {
+    ROS_INFO("Failed to build interpreter.");
+  }
+  interpreter->SetNumThreads(4);
+  if (interpreter->AllocateTensors() != kTfLiteOk) {
+    ROS_INFO("Failed to allocate tensors.");
+  }
+  return interpreter;
+}
+
 bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
     updateParam();
     modelLoaded = false;
@@ -476,7 +511,13 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
         ROS_INFO("Model loaded %s", (model_path+"/"+model_filename).c_str());
         model->error_reporter();
         ROS_INFO("Resolved reporter");
-        tflite::InterpreterBuilder(*model, resolver)(&interpreter);
+        if (edgetpu_found) {
+            std::shared_ptr<edgetpu::EdgeTpuContext> edgetpu_context =
+                edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
+            interpreter = BuildEdgeTpuInterpreter(*model, edgetpu_context.get());
+        } else {
+            interpreter = BuildLocalInterpreter(*model);
+        }
         if (!interpreter) {
             ROS_INFO("Failed to construct interpreter");
         } else {
@@ -486,8 +527,6 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             ROS_INFO("nodes size: %ld", interpreter->nodes_size());
             ROS_INFO("inputs: %ld", interpreter->inputs().size());
             ROS_INFO("input(0) name: %s", interpreter->GetInputName(0));
-
-            interpreter->SetNumThreads(4);
 
             input = interpreter->inputs()[0];
 
@@ -503,10 +542,6 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             
             if ((model_input_type != kTfLiteFloat32) && (model_input_type != kTfLiteInt8) && (model_input_type!= kTfLiteUInt8)) {
                 ROS_INFO("cannot handle input type %d", interpreter->tensor(input)->type);
-            }
-
-            if (interpreter->AllocateTensors() != kTfLiteOk) {
-                ROS_INFO("Failed to allocate tensors!");
             }
 
             output_steering = interpreter->outputs()[0];
@@ -567,6 +602,11 @@ int main(int argc, char **argv)
     ri->initSub();
 
     ROS_INFO("Autopilot: Starting");
+    std::vector<edgetpu::EdgeTpuManager::DeviceEnumerationRecord> edgetpu_devices = edgetpu::EdgeTpuManager::GetSingleton()->EnumerateEdgeTpu();
+    ROS_INFO("Autopilot: TPU found %zu", edgetpu_devices.size());
+    if (edgetpu_devices.size() > 0) {
+        edgetpu_found = true;
+    }
 
     // wait for FCU connection
     ros::Rate rate(loop_hz);
