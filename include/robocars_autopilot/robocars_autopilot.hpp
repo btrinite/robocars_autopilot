@@ -106,7 +106,7 @@ class RosInterface
             int wanted_channels);
         template <class T> float unbind(T* prediction, int prediction_size, size_t num_results,
                TfLiteType input_type);
-               
+
         ros::Subscriber tof1_sub;
         ros::Subscriber tof2_sub;
         image_transport::ImageTransport * it;
@@ -115,7 +115,6 @@ class RosInterface
         ros::ServiceServer reloadModel_svc;
         std::unique_ptr<tflite::FlatBufferModel> model;
         std::unique_ptr<tflite::Interpreter> interpreter;
-        tflite::ops::builtin::BuiltinOpResolver resolver;
         int input;
         int output_steering;
         int output_throttling;
