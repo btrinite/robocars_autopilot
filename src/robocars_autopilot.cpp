@@ -578,16 +578,19 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             output_steering = interpreter->outputs()[0];
             TfLiteIntArray* output_dims = interpreter->tensor(output_steering)->dims;
             output_steering_size = output_dims->data[output_dims->size - 1];
+            model_output_steering_type = interpreter->tensor(output_steering)->type;
             ROS_INFO("Output Steering Size : %d", output_steering_size);
 
             output_throttling = interpreter->outputs()[1];
             output_dims = interpreter->tensor(output_throttling)->dims;
             output_throttling_size = output_dims->data[output_dims->size - 1];
+            model_output_throttling_type = interpreter->tensor(output_throttling)->type;
             ROS_INFO("Output Throttling Size : %d", output_throttling_size);
 
             output_mark = interpreter->outputs()[2];
             output_dims = interpreter->tensor(output_mark)->dims;
             output_mark_size = output_dims->data[output_dims->size - 1];
+            model_output_mark_type = interpreter->tensor(output_mark)->type;
             ROS_INFO("Output Mark Size : %d", output_mark_size);
 
             modelLoaded = true;

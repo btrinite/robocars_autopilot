@@ -125,6 +125,9 @@ class RosInterface
         int wanted_width;
         int wanted_channels;
         TfLiteType model_input_type;
+        TfLiteType model_output_steering_type;
+        TfLiteType model_output_throttling_type;
+        TfLiteType model_output_mark_type;
         int output_steering_size;
         int output_throttling_size;
         int output_mark_size;
