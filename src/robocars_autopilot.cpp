@@ -37,6 +37,7 @@
 
 #include <robocars_msgs/robocars_brain_state.h>
 #include <robocars_msgs/robocars_tof.h>
+#include <robocars_msgs/robocars_mark.h>
 #include <robocars_msgs/robocars_autopilot_output.h>
 
 #include "edgetpu.h"
@@ -252,6 +253,7 @@ void RosInterface::initSub () {
     tof1_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof1", 2, &RosInterface::tof1_msg_cb, this);
     tof2_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof2", 2, &RosInterface::tof2_msg_cb, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 2, &RosInterface::state_msg_cb, this);
+    mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/mark", 2, &RosInterface::mark_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
 }
 void RosInterface::initPub() {
@@ -262,7 +264,7 @@ void RosInterface::initPub() {
 
 static uint32_t lastTof1Value;
 static uint32_t lastTof2Value;
-
+static uint32_t lastLaneValue;
 
 template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
             int image_channels, int wanted_height, int wanted_width,
@@ -440,9 +442,26 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                         output_steering_size, 1, model_input_type);
             break;
         }
+
+        int predicted_Mark;
+        switch (interpreter->tensor(output_mark)->type) {
+            case kTfLiteFloat32:
+                predicted_Mark = unbind<float>(interpreter->typed_output_tensor<float>(2), output_mark_size,
+                    1, model_input_type);
+            break;    
+            case kTfLiteInt8:
+                predicted_Mark = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(2),
+                        output_mark_size, 1, model_input_type);
+                break;
+            case kTfLiteUInt8:
+                predicted_Mark = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
+                        output_mark_size, 1, model_input_type);
+            break;
+        }
+
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
-        send_event(PredictEvent(0,0));
+        send_event(PredictEvent(0.5,0));
     }
 }
 
@@ -452,6 +471,10 @@ void RosInterface::tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg)
 
 void RosInterface::tof2_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg){
     lastTof2Value = msg->distance;
+}
+
+void RosInterface::mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg){
+    lastLaneValue = msg->mark;
 }
 
 void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg) {    
@@ -554,6 +577,11 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             output_dims = interpreter->tensor(output_throttling)->dims;
             output_throttling_size = output_dims->data[output_dims->size - 1];
             ROS_INFO("Output Throttling Size : %d", output_throttling_size);
+
+            output_mark = interpreter->outputs()[2];
+            output_dims = interpreter->tensor(output_throttling)->dims;
+            output_mark_size = output_dims->data[output_dims->size - 1];
+            ROS_INFO("Output Mark Size : %d", output_mark_size);
 
             modelLoaded = true;
         }
