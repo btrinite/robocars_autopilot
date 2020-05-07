@@ -431,34 +431,35 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
         switch (interpreter->tensor(output_steering)->type) {
             case kTfLiteFloat32:
                 predicted_Steering = unbind<float>(interpreter->typed_output_tensor<float>(0), output_steering_size,
-                    1, model_input_type);
+                    1, model_output_steering_type);
             break;    
             case kTfLiteInt8:
                 predicted_Steering = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(0),
-                        output_steering_size, 1, model_input_type);
+                        output_steering_size, 1, model_output_steering_type);
                 break;
             case kTfLiteUInt8:
                 predicted_Steering = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(0),
-                        output_steering_size, 1, model_input_type);
+                        output_steering_size, 1, model_output_steering_type);
             break;
         }
 
-        int predicted_Mark;
+        int predicted_Mark=1.0;
+        /*
         switch (interpreter->tensor(output_mark)->type) {
             case kTfLiteFloat32:
                 predicted_Mark = unbind<float>(interpreter->typed_output_tensor<float>(2), output_mark_size,
-                    1, model_input_type);
+                    1, model_output_mark_type);
             break;    
             case kTfLiteInt8:
                 predicted_Mark = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(2),
-                        output_mark_size, 1, model_input_type);
+                        output_mark_size, 1, model_output_mark_type);
                 break;
             case kTfLiteUInt8:
                 predicted_Mark = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
-                        output_mark_size, 1, model_input_type);
+                        output_mark_size, 1, model_output_mark_type);
             break;
         }
-
+        */
         ROS_INFO ("Prediction : Steering %1.2f Lane %1d", predicted_Steering, predicted_Mark);
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
