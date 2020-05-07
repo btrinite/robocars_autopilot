@@ -459,6 +459,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             break;
         }
 
+        ROS_INFO ("Prediction : Steering %1.2f Lane %1d", predicted_Steering, predicted_Mark);
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
         send_event(PredictEvent(0.5,0));
