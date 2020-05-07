@@ -444,22 +444,22 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
         }
 
         int predicted_Mark=1.0;
-        /*
-        switch (interpreter->tensor(output_mark)->type) {
-            case kTfLiteFloat32:
-                predicted_Mark = unbind<float>(interpreter->typed_output_tensor<float>(2), output_mark_size,
-                    1, model_output_mark_type);
-            break;    
-            case kTfLiteInt8:
-                predicted_Mark = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(2),
-                        output_mark_size, 1, model_output_mark_type);
+        if (interpreter->outputs().size()>2) {
+            switch (interpreter->tensor(output_mark)->type) {
+                case kTfLiteFloat32:
+                    predicted_Mark = unbind<float>(interpreter->typed_output_tensor<float>(2), output_mark_size,
+                        1, model_output_mark_type);
+                break;    
+                case kTfLiteInt8:
+                    predicted_Mark = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(2),
+                            output_mark_size, 1, model_output_mark_type);
+                    break;
+                case kTfLiteUInt8:
+                    predicted_Mark = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
+                            output_mark_size, 1, model_output_mark_type);
                 break;
-            case kTfLiteUInt8:
-                predicted_Mark = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
-                        output_mark_size, 1, model_output_mark_type);
-            break;
+            }
         }
-        */
         ROS_INFO ("Prediction : Steering %1.2f Lane %1d", predicted_Steering, predicted_Mark);
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
@@ -588,11 +588,13 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             model_output_throttling_type = interpreter->tensor(output_throttling)->type;
             ROS_INFO("Output Throttling Size : %d", output_throttling_size);
 
-            output_mark = interpreter->outputs()[2];
-            output_dims = interpreter->tensor(output_mark)->dims;
-            output_mark_size = output_dims->data[output_dims->size - 1];
-            model_output_mark_type = interpreter->tensor(output_mark)->type;
-            ROS_INFO("Output Mark Size : %d", output_mark_size);
+            if (interpreter->outputs().size()>2) {
+                output_mark = interpreter->outputs()[2];
+                output_dims = interpreter->tensor(output_mark)->dims;
+                output_mark_size = output_dims->data[output_dims->size - 1];
+                model_output_mark_type = interpreter->tensor(output_mark)->type;
+                ROS_INFO("Output Mark Size : %d", output_mark_size);
+            }
 
             modelLoaded = true;
         }
