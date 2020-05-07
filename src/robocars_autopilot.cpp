@@ -585,7 +585,7 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             ROS_INFO("Output Throttling Size : %d", output_throttling_size);
 
             output_mark = interpreter->outputs()[2];
-            output_dims = interpreter->tensor(output_throttling)->dims;
+            output_dims = interpreter->tensor(output_mark)->dims;
             output_mark_size = output_dims->data[output_dims->size - 1];
             ROS_INFO("Output Mark Size : %d", output_mark_size);
 
