@@ -72,7 +72,7 @@ bool edgetpu_found = false;
     Lane 2 is the right one,
     A steering value of -1 means to turn right, 1 means to turn left  
 */
-float targetLane2Steering[3][3] = { {0.0 , -0.5 , -0.7}, {-0.5 , 0.0 , 0.5}, {0.7 , 0.5 , 0.0}};
+float targetLane2Steering[3][3] = { {0.0 , 0.5 , 0.7}, {0.5 , 0.0 , -0.5}, {-0.7 , -0.5 , 0.0}};
 
 class onRunningMode;
 class onIdle;
