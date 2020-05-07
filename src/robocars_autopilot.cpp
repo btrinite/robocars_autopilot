@@ -62,6 +62,7 @@ static int loop_hz;
 static std::string model_filename;
 static std::string model_path;
 static float throttling_fixed_value;
+static bool lane_guidance_mode;
 
 bool edgetpu_found = false;
 
@@ -239,12 +240,17 @@ void RosInterface::initParam() {
     if (!node_.hasParam("fix_autopilot_throttle_value")) {
         node_.setParam("fix_autopilot_throttle_value",0.35);
     }
+    if (!node_.hasParam("lane_guidance_mode")) {
+        node_.setParam("lane_guidance_mode",false);
+    }
+
 }
 void RosInterface::updateParam() {
     node_.getParam("loop_hz", loop_hz);
     node_.getParam("model_path", model_path);
     node_.getParam("model_filename", model_filename);
     node_.getParam("fix_autopilot_throttle_value", throttling_fixed_value);
+    node_.getParam("lane_guidance_mode", lane_guidance_mode);
 }
 
 
@@ -443,8 +449,8 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             break;
         }
 
-        int predicted_Mark=1.0;
         if (interpreter->outputs().size()>2) {
+            int predicted_Mark=1;
             switch (interpreter->tensor(output_mark)->type) {
                 case kTfLiteFloat32:
                     predicted_Mark = unbind<float>(interpreter->typed_output_tensor<float>(2), output_mark_size,
@@ -459,8 +465,31 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                             output_mark_size, 1, model_output_mark_type);
                 break;
             }
+            ROS_INFO ("Prediction : Steering %1.2f Lane %1d", predicted_Steering, predicted_Mark);
+            if (lane_guidance_mode) {
+                switch (lastLaneValue) {
+                    case 0:
+                        if (predicted_Mark>0) {
+                            predicted_Steering = 0.7;
+                        }
+                    break;
+                    case 1:
+                        if (predicted_Mark<1) {
+                            predicted_Steering = -0.5;
+                            
+                        } else if (predicted_Mark>1) {
+                            predicted_Steering = 0.5;
+                        }
+
+                    break;
+                    case 2:
+                        if (predicted_Mark<2) {
+                            predicted_Steering = -0.7;
+                        }
+                    break;
+                }
+            }
         }
-        ROS_INFO ("Prediction : Steering %1.2f Lane %1d", predicted_Steering, predicted_Mark);
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
         send_event(PredictEvent(0.5,0));
