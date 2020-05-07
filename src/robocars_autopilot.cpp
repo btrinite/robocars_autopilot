@@ -550,7 +550,13 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             ROS_INFO("tensors size: %ld", interpreter->tensors_size());
             ROS_INFO("nodes size: %ld", interpreter->nodes_size());
             ROS_INFO("inputs: %ld", interpreter->inputs().size());
-            ROS_INFO("input(0) name: %s", interpreter->GetInputName(0));
+            for (uint idx=0;idx<interpreter->inputs().size();idx++) {
+                ROS_INFO("  input(%d) name: %s", idx, interpreter->GetInputName(idx));
+            }
+            ROS_INFO("outputs: %ld", interpreter->outputs().size());
+            for (uint idx=0;idx<interpreter->outputs().size();idx++) {
+                ROS_INFO("  output(%d) name: %s", idx, interpreter->GetOutputName(idx));
+            }
 
             input = interpreter->inputs()[0];
 
