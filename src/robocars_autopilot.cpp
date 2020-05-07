@@ -66,6 +66,14 @@ static bool lane_guidance_mode;
 
 bool edgetpu_found = false;
 
+/* Array to map [Wanted lane][actual lane] to steering control. 
+    Lane 0 is the left one
+    Lane 1 is the middle lane,
+    Lane 2 is the right one,
+    A steering value of -1 means to turn right, 1 means to turn left  
+*/
+float targetLane2Steering[3][3] = { {0.0 , -0.5 , -0.7}, {-0.5 , 0.0 , 0.5}, {0.7 , 0.5 , 0.0}};
+
 class onRunningMode;
 class onIdle;
 class onManualDriving;
@@ -466,28 +474,9 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                 break;
             }
             ROS_INFO ("Prediction : Steering %1.2f Lane %1d", predicted_Steering, predicted_Mark);
-            if (lane_guidance_mode) {
-                switch (lastLaneValue) {
-                    case 0:
-                        if (predicted_Mark>0) {
-                            predicted_Steering = 0.7;
-                        }
-                    break;
-                    case 1:
-                        if (predicted_Mark<1) {
-                            predicted_Steering = -0.5;
-                            
-                        } else if (predicted_Mark>1) {
-                            predicted_Steering = 0.5;
-                        }
-
-                    break;
-                    case 2:
-                        if (predicted_Mark<2) {
-                            predicted_Steering = -0.7;
-                        }
-                    break;
-                }
+            float steeringFix = targetLane2Steering[lastLaneValue][predicted_Mark];
+            if (steeringFix != 0.0) {
+                    predicted_Steering = steeringFix; 
             }
         }
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
