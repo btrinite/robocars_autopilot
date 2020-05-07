@@ -474,8 +474,8 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                 break;
             }
             uint32_t predicted_denorm_Mark = 1+predicted_Mark;
-            ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d", predicted_Steering, predicted_denorm_Mark, lastLaneValue);
             float steeringFix = targetLane2Steering[lastLaneValue][predicted_denorm_Mark];
+            ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d, Apply steering fix %1.2f", predicted_Steering, predicted_denorm_Mark, lastLaneValue,steeringFix);
             if (steeringFix != 0.0) {
                     predicted_Steering = steeringFix; 
             }
