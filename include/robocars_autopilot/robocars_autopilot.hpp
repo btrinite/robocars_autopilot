@@ -117,6 +117,7 @@ class RosInterface
         ros::ServiceServer reloadModel_svc;
         std::unique_ptr<tflite::FlatBufferModel> model;
         std::unique_ptr<tflite::Interpreter> interpreter;
+        std::shared_ptr<edgetpu::EdgeTpuContext> edgetpu_context;
         int input;
         int output_steering;
         int output_throttling;

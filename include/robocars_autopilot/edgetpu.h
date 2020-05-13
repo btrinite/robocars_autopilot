@@ -118,21 +118,19 @@ class EdgeTpuContext;
 // Singleton edge TPU manager for allocating new TPU contexts.
 // Functions in this interface are thread-safe.
 class EDGETPU_EXPORT EdgeTpuManager {
- public:
+public:
   using DeviceOptions = std::unordered_map<std::string, std::string>;
   struct DeviceEnumerationRecord {
     DeviceType type;
     std::string path;
 
     // Returns true if two enumeration records point to the same device.
-    friend bool operator==(const DeviceEnumerationRecord& lhs,
-                           const DeviceEnumerationRecord& rhs) {
+    friend bool operator==(const DeviceEnumerationRecord& lhs, const DeviceEnumerationRecord& rhs) {
       return (lhs.type == rhs.type) && (lhs.path == rhs.path);
     }
 
     // Returns true if two enumeration records point to defferent devices.
-    friend bool operator!=(const DeviceEnumerationRecord& lhs,
-                           const DeviceEnumerationRecord& rhs) {
+    friend bool operator!=(const DeviceEnumerationRecord& lhs, const DeviceEnumerationRecord& rhs) {
       return !(lhs == rhs);
     }
   };
@@ -163,8 +161,7 @@ class EDGETPU_EXPORT EdgeTpuManager {
 
   // Same as above, but the created context is associated with the specified
   // type.
-  virtual std::unique_ptr<EdgeTpuContext> NewEdgeTpuContext(
-      DeviceType device_type) = 0;
+  virtual std::unique_ptr<EdgeTpuContext> NewEdgeTpuContext(DeviceType device_type) = 0;
 
   // Same as above, but the created context is associated with the specified
   // type and device path.
@@ -179,8 +176,7 @@ class EDGETPU_EXPORT EdgeTpuManager {
   //  - "Usb.AlwaysDfu": ["True", "False"] (Default is "False")
   //  - "Usb.MaxBulkInQueueLength": ["0",.., "255"] (Default is "32")
   virtual std::unique_ptr<EdgeTpuContext> NewEdgeTpuContext(
-      DeviceType device_type, const std::string& device_path,
-      const DeviceOptions& options) = 0;
+      DeviceType device_type, const std::string& device_path, const DeviceOptions& options) = 0;
 
   // Enumerates all connected Edge TPU devices.
   virtual std::vector<DeviceEnumerationRecord> EnumerateEdgeTpu() const = 0;
@@ -204,8 +200,7 @@ class EDGETPU_EXPORT EdgeTpuManager {
 
   // Same as above, but the returned context is associated with the specified
   // type.
-  virtual std::shared_ptr<EdgeTpuContext> OpenDevice(
-      DeviceType device_type) = 0;
+  virtual std::shared_ptr<EdgeTpuContext> OpenDevice(DeviceType device_type) = 0;
 
   // Same as above, but the returned context is associated with the specified
   // type and device path. If path is empty, any device of the specified type
@@ -225,14 +220,12 @@ class EDGETPU_EXPORT EdgeTpuManager {
   //  - "Usb.AlwaysDfu": ["True", "False"] (Default is "False")
   //  - "Usb.MaxBulkInQueueLength": ["0",.., "255"] (Default is "32")
   virtual std::shared_ptr<EdgeTpuContext> OpenDevice(
-      DeviceType device_type, const std::string& device_path,
-      const DeviceOptions& options) = 0;
+      DeviceType device_type, const std::string& device_path, const DeviceOptions& options) = 0;
 
   // Returns a snapshot of currently opened shareable devices.
   // Exclusively owned Edge TPU devices cannot be returned here, as they're
   // owned by unique pointers.
-  virtual std::vector<std::shared_ptr<EdgeTpuContext>> GetOpenedDevices()
-      const = 0;
+  virtual std::vector<std::shared_ptr<EdgeTpuContext>> GetOpenedDevices() const = 0;
 
   // Sets verbosity of operating logs related to edge TPU.
   // Verbosity level can be set to [0-10], in which 10 is the most verbose.
@@ -241,7 +234,7 @@ class EDGETPU_EXPORT EdgeTpuManager {
   // Returns the version of EdgeTPU runtime stack.
   virtual std::string Version() const = 0;
 
- protected:
+protected:
   // No deletion for this singleton instance.
   virtual ~EdgeTpuManager() = default;
 };
@@ -253,13 +246,12 @@ class EDGETPU_EXPORT EdgeTpuManager {
 // avoid using this pointer directly.
 // Functions in this interface are thread-safe.
 class EdgeTpuContext : public TfLiteExternalContext {
- public:
+public:
   virtual ~EdgeTpuContext() = 0;
 
   // Returns a pointer to the device enumeration record for this device,
   // if available.
-  virtual const EdgeTpuManager::DeviceEnumerationRecord& GetDeviceEnumRecord()
-      const = 0;
+  virtual const EdgeTpuManager::DeviceEnumerationRecord& GetDeviceEnumRecord() const = 0;
 
   // Returns a snapshot of the options used to open this
   // device, and current state, if available.
@@ -282,8 +274,7 @@ class EdgeTpuContext : public TfLiteExternalContext {
 EDGETPU_EXPORT TfLiteRegistration* RegisterCustomOp();
 
 // Inserts name of device type into ostream. Returns the modified ostream.
-EDGETPU_EXPORT std::ostream& operator<<(std::ostream& out,
-                                        DeviceType device_type);
+EDGETPU_EXPORT std::ostream& operator<<(std::ostream& out, DeviceType device_type);
 
 }  // namespace edgetpu
 

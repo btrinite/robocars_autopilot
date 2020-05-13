@@ -22,6 +22,7 @@
 #include <date.h>
 #include <json.hpp>
 
+#include "model_utils.h"
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -72,7 +73,7 @@ bool edgetpu_found = false;
     Lane 2 is the right one,
     A steering value of -1 means to turn right, 1 means to turn left  
 */
-float targetLane2Steering[3][3] = { {0.0 , 0.5 , 0.7}, {0.5 , 0.0 , -0.5}, {-0.7 , -0.5 , 0.0}};
+float targetLane2Steering[3][3] = { {0.0 , -0.5 , -0.7}, {0.5 , 0.0 , -0.5}, {0.7 , 0.5 , 0.0}};
 
 class onRunningMode;
 class onIdle;
@@ -434,9 +435,13 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                     wanted_width, wanted_channels);
             break;
             case kTfLiteUInt8:
-                resize<uint8_t>(interpreter->typed_tensor<uint8_t>(input), in.data(),
+                  uint8_t* fillInput = interpreter->typed_input_tensor<uint8_t>(input);
+                  std::memcpy(fillInput, in.data(), in.size());
+                /*
+                resize<uint8_t>(interpreter->typed_input_tensor<uint8_t>(input), in.data(),
                     image_height, image_width, image_channels, wanted_height,
                     wanted_width, wanted_channels);
+                    */
             break;
         }
         interpreter->Invoke();
@@ -516,38 +521,6 @@ void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::Const
     }    
 }
 
-std::unique_ptr<tflite::Interpreter> BuildEdgeTpuInterpreter(
-    const tflite::FlatBufferModel& model,
-    edgetpu::EdgeTpuContext* edgetpu_context) {
-  tflite::ops::builtin::BuiltinOpResolver resolver;
-  resolver.AddCustom(edgetpu::kCustomOp, edgetpu::RegisterCustomOp());
-  std::unique_ptr<tflite::Interpreter> interpreter;
-  if (tflite::InterpreterBuilder(model, resolver)(&interpreter) != kTfLiteOk) {
-    ROS_INFO ("Failed to build interpreter.");
-  }
-  // Bind given context with interpreter.
-  interpreter->SetExternalContext(kTfLiteEdgeTpuContext, edgetpu_context);
-  interpreter->SetNumThreads(1);
-  if (interpreter->AllocateTensors() != kTfLiteOk) {
-    ROS_INFO("Failed to allocate tensors.");
-  }
-  return interpreter;
-}
-
-std::unique_ptr<tflite::Interpreter> BuildLocalInterpreter(
-    const tflite::FlatBufferModel& model) {
-  tflite::ops::builtin::BuiltinOpResolver resolver;
-  std::unique_ptr<tflite::Interpreter> interpreter;
-  if (tflite::InterpreterBuilder(model, resolver)(&interpreter) != kTfLiteOk) {
-    ROS_INFO("Failed to build interpreter.");
-  }
-  interpreter->SetNumThreads(4);
-  if (interpreter->AllocateTensors() != kTfLiteOk) {
-    ROS_INFO("Failed to allocate tensors.");
-  }
-  return interpreter;
-}
-
 bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
     updateParam();
     modelLoaded = false;
@@ -557,17 +530,19 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
         model->error_reporter();
         ROS_INFO("Resolved reporter");
         if (edgetpu_found) {
-            std::shared_ptr<edgetpu::EdgeTpuContext> edgetpu_context =
+            edgetpu_context =
                 edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
-            interpreter = BuildEdgeTpuInterpreter(*model, edgetpu_context.get());
-        } else {
-            interpreter = BuildLocalInterpreter(*model);
         }
+        if (!edgetpu_context) {
+            interpreter = std::move(coral::BuildInterpreter(*model));
+        } else {
+            interpreter = std::move(coral::BuildEdgeTpuInterpreter(*model, edgetpu_context.get()));
+        }
+
         if (!interpreter) {
             ROS_INFO("Failed to construct interpreter");
         } else {
-            interpreter->UseNNAPI(0);
-            interpreter->SetAllowFp16PrecisionForFp32(0);
+
             ROS_INFO("tensors size: %ld", interpreter->tensors_size());
             ROS_INFO("nodes size: %ld", interpreter->nodes_size());
             ROS_INFO("inputs: %ld", interpreter->inputs().size());
@@ -580,16 +555,15 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             }
 
             input = interpreter->inputs()[0];
+            const auto& required_shape = coral::GetInputShape(*interpreter, 0);
 
             TfLiteIntArray* dims = interpreter->tensor(input)->dims;
-            wanted_height = dims->data[1];
-            wanted_width = dims->data[2];
-            wanted_channels = dims->data[3];
             model_input_type = interpreter->tensor(input)->type;
-            ROS_INFO("wanted_height: %d", wanted_height);
-            ROS_INFO("wanted_width: %d", wanted_width);
-            ROS_INFO("wanted_channels: %d", wanted_channels);
-            ROS_INFO("Input Type : %d", model_input_type);
+
+            ROS_INFO("wanted_height: %d", required_shape[0]);
+            ROS_INFO("wanted_width: %d", required_shape[1]);
+            ROS_INFO("wanted_channels: %d", required_shape[2]);
+            ROS_INFO("Input Type : %d (%d %d %d)", model_input_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
             
             if ((model_input_type != kTfLiteFloat32) && (model_input_type != kTfLiteInt8) && (model_input_type!= kTfLiteUInt8)) {
                 ROS_INFO("cannot handle input type %d", interpreter->tensor(input)->type);

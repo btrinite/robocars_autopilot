@@ -139,6 +139,7 @@ include_directories(
 ## Declare a C++ library
 # add_library(${PROJECT_NAME}
 #   src/${PROJECT_NAME}/robocars_autopilot.cpp
+#   src/${PROJECT_NAME}/model_utils.cpp
 # )
 
 ## Add cmake target dependencies of the library
@@ -150,7 +151,7 @@ include_directories(
 ## With catkin_make all packages are built within a single CMake context
 ## The recommended prefix ensures that target names across packages don't collide
 
-add_executable(robocars_autopilot src/robocars_autopilot.cpp)
+add_executable(robocars_autopilot src/robocars_autopilot.cpp src/model_utils.cc)
 
 ## Rename C++ executable without prefix
 ## The above recommended prefix causes long target names, the following renames the
