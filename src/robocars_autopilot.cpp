@@ -446,7 +446,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             break;
         }
         interpreter->Invoke();
-
+        ROS_INFO ("Invoke done");
         float predicted_Steering;
         switch (interpreter->tensor(output_steering)->type) {
             case kTfLiteFloat32:
@@ -463,6 +463,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                 predicted_Steering = -1.0 + (predicted_Steering*2.0);        
             break;
         }
+        ROS_INFO ("predicted_Steering done");
 
         if (interpreter->outputs().size()>2) {
             int predicted_Mark=1;
@@ -486,6 +487,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             if (lane_guidance_mode && (steeringFix != 0.0)) {
                     predicted_Steering = steeringFix; 
             }
+            ROS_INFO ("predicted_Mark done");
         }
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
@@ -576,12 +578,14 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             output_steering_size = output_dims->data[output_dims->size - 1];
             model_output_steering_type = interpreter->tensor(output_steering)->type;
             ROS_INFO("Output Steering Size : %d", output_steering_size);
+            ROS_INFO("Output Steering Type : %d", model_output_steering_type);
 
             output_throttling = interpreter->outputs()[1];
             output_dims = interpreter->tensor(output_throttling)->dims;
             output_throttling_size = output_dims->data[output_dims->size - 1];
             model_output_throttling_type = interpreter->tensor(output_throttling)->type;
             ROS_INFO("Output Throttling Size : %d", output_throttling_size);
+            ROS_INFO("Output Throttling Type : %d", model_output_throttling_type);
 
             if (interpreter->outputs().size()>2) {
                 output_mark = interpreter->outputs()[2];
@@ -589,6 +593,7 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
                 output_mark_size = output_dims->data[output_dims->size - 1];
                 model_output_mark_type = interpreter->tensor(output_mark)->type;
                 ROS_INFO("Output Mark Size : %d", output_mark_size);
+                ROS_INFO("Output Mark Type : %d", model_output_mark_type);
             }
 
             modelLoaded = true;
