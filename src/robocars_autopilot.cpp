@@ -445,6 +445,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                     */
             break;
         }
+        ROS_INFO ("Invoke called");
         interpreter->Invoke();
         ROS_INFO ("Invoke done");
         float predicted_Steering;
