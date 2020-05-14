@@ -422,6 +422,8 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             return;
         }
 
+        ROS_INFO ("Got image");
+
         const std::vector<int> inputs = interpreter->inputs();
         const std::vector<int> outputs = interpreter->outputs();
         switch (model_input_type) {
