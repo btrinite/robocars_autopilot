@@ -460,6 +460,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             case kTfLiteUInt8:
                 predicted_Steering = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(0),
                         output_steering_size, 1, model_output_steering_type);
+                predicted_Steering = -1 + (predicted_Steering*2);        
             break;
         }
 
