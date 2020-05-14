@@ -44,6 +44,7 @@
 #include "edgetpu.h"
 
 #include "tensorflow/lite/model.h"
+#include "tensorflow/lite/version.h"
 #include "tensorflow/lite/string_type.h"
 #include "absl/memory/memory.h"
 #include "tensorflow/lite/builtin_op_data.h"
@@ -481,7 +482,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             uint32_t predicted_denorm_Mark = 1+predicted_Mark;
             float steeringFix = targetLane2Steering[lastLaneValue][predicted_denorm_Mark];
             ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d, Apply steering fix %1.2f", predicted_Steering, predicted_denorm_Mark, lastLaneValue,steeringFix);
-            if (steeringFix != 0.0) {
+            if (lane_guidance_mode && (steeringFix != 0.0)) {
                     predicted_Steering = steeringFix; 
             }
         }
@@ -637,6 +638,7 @@ int main(int argc, char **argv)
     ri->initSub();
 
     ROS_INFO("Autopilot: Starting");
+    ROS_INFO("TF Version %s", TFLITE_VERSION_STRING);
     std::vector<edgetpu::EdgeTpuManager::DeviceEnumerationRecord> edgetpu_devices = edgetpu::EdgeTpuManager::GetSingleton()->EnumerateEdgeTpu();
     ROS_INFO("Autopilot: TPU found %zu", edgetpu_devices.size());
     if (edgetpu_devices.size() > 0) {
