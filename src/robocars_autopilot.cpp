@@ -422,8 +422,6 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             return;
         }
 
-        ROS_INFO ("Got image");
-
         const std::vector<int> inputs = interpreter->inputs();
         const std::vector<int> outputs = interpreter->outputs();
         switch (model_input_type) {
@@ -447,9 +445,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                     */
             break;
         }
-        ROS_INFO ("Invoke called");
         interpreter->Invoke();
-        ROS_INFO ("Invoke done");
         float predicted_Steering;
         switch (interpreter->tensor(output_steering)->type) {
             case kTfLiteFloat32:
@@ -466,7 +462,6 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                 predicted_Steering = -1.0 + (predicted_Steering*2.0);        
             break;
         }
-        ROS_INFO ("predicted_Steering done");
 
         if (interpreter->outputs().size()>2) {
             int predicted_Mark=1;
@@ -486,11 +481,12 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
             }
             uint32_t predicted_denorm_Mark = 1+predicted_Mark;
             float steeringFix = targetLane2Steering[lastLaneValue][predicted_denorm_Mark];
-            ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d, Apply steering fix %1.2f", predicted_Steering, predicted_denorm_Mark, lastLaneValue,steeringFix);
             if (lane_guidance_mode && (steeringFix != 0.0)) {
-                    predicted_Steering = steeringFix; 
+                ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d, Apply steering fix %1.2f", predicted_Steering, predicted_denorm_Mark, lastLaneValue,steeringFix);
+                predicted_Steering = steeringFix; 
+            } else {
+                ROS_INFO ("Prediction : Steering %1.2f", predicted_Steering);
             }
-            ROS_INFO ("predicted_Mark done");
         }
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
     } else {
