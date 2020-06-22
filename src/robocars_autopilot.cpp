@@ -22,6 +22,9 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
  * SOFTWARE.
  * 
+ * Derived work from :
+ *  - https://github.com/Namburger/edgetpu-minimal-example
+ *  
  * main topic subscribed : 
  *  - /front_video_resize/image : the resized front video image
  *  - /robocars_brain_state : not used, as soon as a model is loaded, prediction on each received image starts
