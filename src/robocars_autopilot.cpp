@@ -1,11 +1,45 @@
 /**
- * @file offb_raw_node.cpp
- * @brief Offboard control example node, written with MAVROS version 0.19.x, PX4 Pro Flight
- * Stack and tested in Gazebo SITL
- source $src_path/Tools/setup_gazebo.bash ${src_path} ${build_path}
-
- gzserver --verbose ${src_path}/Tools/sitl_gazebo/worlds/${model}.world &
+ * @file robocars_autopilot.cpp
+ * @brief When model loaded, perform inference on image received, and publish topic with predcited steering. Speed is a stupid constant for now
+ * 
+ * Copyright (c) 2020 Benoit TRINITE
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to deal
+ * in the Software without restriction, including without limitation the rights
+ * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+ * copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ * 
+ * The above copyright notice and this permission notice shall be included in all
+ * copies or substantial portions of the Software.
+ * 
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+ * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+ * SOFTWARE.
+ * 
+ * main topic subscribed : 
+ *  - /front_video_resize/image : the resized front video image
+ *  - /robocars_brain_state : not used, as soon as a model is loaded, prediction on each received image starts
+ * 
+ * Topic published :
+ *  - /autopilot/steering : predicted steering
+ *  - /autopilot/throttling : predicted throtting (actually a configured fixed value)
+ *  - /autopilot/stats : statistics about lost frame
+ * 
+ * Parameters :
+ *  - loop_hz : tick frequency, used by FSM to trigger recurrent jobs like uopdating node's configuration, this implementation does not provide best performance (response time)
+ *  - model_path : path zhere fo find model
+ *  - model_filename : name of the model file to load
+ * 
+ * Services
+ *  - reloadModel : invoke this service to trigger model loading
  */
+
 #include <tinyfsm.hpp>
 #include <ros/ros.h>
 #include <sys/types.h>
@@ -37,7 +71,6 @@
 #include <std_srvs/Empty.h>
 
 #include <robocars_msgs/robocars_brain_state.h>
-#include <robocars_msgs/robocars_tof.h>
 #include <robocars_msgs/robocars_mark.h>
 #include <robocars_msgs/robocars_autopilot_output.h>
 
@@ -200,10 +233,6 @@ class onAutonomousDriving
             transit<onManualDriving>();
         };
 
-        void react( PredictEvent const & e) override { 
-            onRunningMode::react(e);
-        };
-
         virtual void react(TickEvent                      const & e) override { 
             onRunningMode::react(e);
         };
@@ -217,10 +246,7 @@ uint32_t mapRange(uint32_t in1,uint32_t in2,uint32_t out1,uint32_t out2,uint32_t
   if (value>in2) {value=in2;}
   return out1 + ((value-in1)*(out2-out1))/(in2-in1);
 }
-
-void RosInterface::predict() {
-}
-
+s
 void RosInterface::publishPredict(_Float32 steering, _Float32 throttling) {
     robocars_msgs::robocars_autopilot_output steeringMsg;
     robocars_msgs::robocars_autopilot_output throttlingMsg;
@@ -266,8 +292,6 @@ void RosInterface::updateParam() {
 
 void RosInterface::initSub () {
     sub_image_and_camera = it->subscribeCamera("/front_video_resize/image", 2, &RosInterface::callbackWithCameraInfo, this);
-    tof1_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof1", 2, &RosInterface::tof1_msg_cb, this);
-    tof2_sub = node_.subscribe<robocars_msgs::robocars_tof>("/sensors/tof2", 2, &RosInterface::tof2_msg_cb, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 2, &RosInterface::state_msg_cb, this);
     mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/mark", 2, &RosInterface::mark_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
@@ -278,8 +302,6 @@ void RosInterface::initPub() {
     stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 10);
 }
 
-static uint32_t lastTof1Value;
-static uint32_t lastTof2Value;
 static uint32_t lastLaneValue;
 
 template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
@@ -436,6 +458,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                     wanted_width, wanted_channels);
             break;
             case kTfLiteUInt8:
+                /*WIP resize code (based on tf operators) not working on edge tpu for now, since image input is already at the correct size, just copy image as is in tensor*/
                   uint8_t* fillInput = interpreter->typed_input_tensor<uint8_t>(input);
                   std::memcpy(fillInput, in.data(), in.size());
                 /*
@@ -445,7 +468,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
                     */
             break;
         }
-        interpreter->Invoke();
+        interpreter->Invoke(); // this is where the magick happen
         float predicted_Steering;
         switch (interpreter->tensor(output_steering)->type) {
             case kTfLiteFloat32:
@@ -492,14 +515,6 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
     } else {
         send_event(PredictEvent(0.5,0));
     }
-}
-
-void RosInterface::tof1_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg){
-    lastTof1Value = msg->distance;
-}
-
-void RosInterface::tof2_msg_cb(const robocars_msgs::robocars_tof::ConstPtr& msg){
-    lastTof2Value = msg->distance;
 }
 
 void RosInterface::mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg){
