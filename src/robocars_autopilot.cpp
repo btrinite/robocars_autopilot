@@ -249,7 +249,7 @@ uint32_t mapRange(uint32_t in1,uint32_t in2,uint32_t out1,uint32_t out2,uint32_t
   if (value>in2) {value=in2;}
   return out1 + ((value-in1)*(out2-out1))/(in2-in1);
 }
-s
+
 void RosInterface::publishPredict(_Float32 steering, _Float32 throttling) {
     robocars_msgs::robocars_autopilot_output steeringMsg;
     robocars_msgs::robocars_autopilot_output throttlingMsg;
