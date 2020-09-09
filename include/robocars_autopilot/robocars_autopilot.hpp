@@ -123,6 +123,7 @@ class RosInterface
 
 
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
+        void callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_msg);
         void mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg);
         bool reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
@@ -135,6 +136,7 @@ class RosInterface
         ros::Subscriber mark_sub;
         image_transport::ImageTransport * it;
         image_transport::CameraSubscriber sub_image_and_camera;
+        image_transport::Subscriber sub_image;
 
         ros::ServiceServer reloadModel_svc;
         std::unique_ptr<tflite::FlatBufferModel> model;
