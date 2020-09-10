@@ -315,7 +315,6 @@ template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_heig
   std::unique_ptr<tflite::Interpreter> interpreter(new tflite::Interpreter);
 
   int base_index = 0;
-
   // two inputs: input and new_sizes
   interpreter->AddTensors(2, &base_index);
   // one output
@@ -452,16 +451,30 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         const std::vector<int> outputs = interpreter->outputs();
         switch (model_input_type) {
             case kTfLiteFloat32:
-                resize<float>(interpreter->typed_tensor<float>(input), in.data(),
+            {
+                /* resize<float>(interpreter->typed_tensor<float>(input), in.data(),
                     image_height, image_width, image_channels, wanted_height,
                     wanted_width, wanted_channels);
+                */
+                /*std::transform(in.begin(), in.end(), interpreter->typed_tensor<float>(input),
+                 [](uchar i) { return i / 254; });
+                */
+                float* fillInput = interpreter->typed_tensor<float>(input);
+                for (int i=0; i<in.size();i++) {
+                    //fillInput[i] = ((float)in[i]-127.5)/127.5;
+                    fillInput[i] = (float)in[i];
+                }
+            }
             break;
             case kTfLiteInt8:
+            {
                 resize<int8_t>(interpreter->typed_tensor<int8_t>(input), in.data(),
                     image_height, image_width, image_channels, wanted_height,
                     wanted_width, wanted_channels);
+            }
             break;
             case kTfLiteUInt8:
+            {
                 /*WIP resize code (based on tf operators) not working on edge tpu for now, since image input is already at the correct size, just copy image as is in tensor*/
                   uint8_t* fillInput = interpreter->typed_input_tensor<uint8_t>(input);
                   std::memcpy(fillInput, in.data(), in.size());
@@ -470,21 +483,23 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                     image_height, image_width, image_channels, wanted_height,
                     wanted_width, wanted_channels);
                     */
+            }
             break;
         }
+
         interpreter->Invoke(); // this is where the magick happen
         float predicted_Steering;
         switch (interpreter->tensor(output_steering)->type) {
             case kTfLiteFloat32:
-                predicted_Steering = unbind<float>(interpreter->typed_output_tensor<float>(0), output_steering_size,
+                predicted_Steering = unbind<float>(interpreter->typed_tensor<float>(output_steering), output_steering_size,
                     1, model_output_steering_type);
             break;    
             case kTfLiteInt8:
-                predicted_Steering = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(0),
+                predicted_Steering = unbind<int8_t>(interpreter->typed_tensor<int8_t>(output_steering),
                         output_steering_size, 1, model_output_steering_type);
                 break;
             case kTfLiteUInt8:
-                predicted_Steering = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(0),
+                predicted_Steering = unbind<uint8_t>(interpreter->typed_tensor<uint8_t>(output_steering),
                         output_steering_size, 1, model_output_steering_type);
                 predicted_Steering = -1.0 + (predicted_Steering*2.0);        
             break;
@@ -587,6 +602,7 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             TfLiteIntArray* dims = interpreter->tensor(input)->dims;
             model_input_type = interpreter->tensor(input)->type;
 
+            ROS_INFO("Input idx: %d", input);
             ROS_INFO("wanted_height: %d", required_shape[0]);
             ROS_INFO("wanted_width: %d", required_shape[1]);
             ROS_INFO("wanted_channels: %d", required_shape[2]);
@@ -600,6 +616,7 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             TfLiteIntArray* output_dims = interpreter->tensor(output_steering)->dims;
             output_steering_size = output_dims->data[output_dims->size - 1];
             model_output_steering_type = interpreter->tensor(output_steering)->type;
+            ROS_INFO("Output Steering Idx : %d", output_steering);
             ROS_INFO("Output Steering Size : %d", output_steering_size);
             ROS_INFO("Output Steering Type : %d", model_output_steering_type);
 
