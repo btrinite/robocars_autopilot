@@ -420,9 +420,11 @@ template <class T> float RosInterface::unbind(T* prediction, int prediction_size
 void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_msg) {
     static uint32_t lastSeq = 0;
     cv_bridge::CvImagePtr cv_ptr;
+    static uint32_t missingSeq = 0;
 
-    if (updateStats(1, image_msg->header.seq-(lastSeq+1))) {
-        ROS_WARN ("Autopilot: Losing images");
+    missingSeq = image_msg->header.seq-(lastSeq+1);
+    if (updateStats(1, missingSeq) {
+        ROS_WARN ("Autopilot: Losing %d images(Seq %d)", missingSeq, image_msg->header.seq);
     };
     lastSeq = image_msg->header.seq;
 
