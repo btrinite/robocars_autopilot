@@ -294,10 +294,10 @@ void RosInterface::updateParam() {
 
 
 void RosInterface::initSub () {
-    //sub_image_and_camera = it->subscribeCamera("/front_video_resize/image", 2, &RosInterface::callbackWithCameraInfo, this);
-    sub_image = it->subscribe("/front_video_resize/image", 2, &RosInterface::callbackNoCameraInfo, this);
-    state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 2, &RosInterface::state_msg_cb, this);
-    mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/mark", 2, &RosInterface::mark_msg_cb, this);
+    //sub_image_and_camera = it->subscribeCamera("/front_video_resize/image", 1, &RosInterface::callbackWithCameraInfo, this);
+    sub_image = it->subscribe("/front_video_resize/image", 1, &RosInterface::callbackNoCameraInfo, this);
+    state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 1, &RosInterface::state_msg_cb, this);
+    mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/mark", 1, &RosInterface::mark_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
 }
 void RosInterface::initPub() {
