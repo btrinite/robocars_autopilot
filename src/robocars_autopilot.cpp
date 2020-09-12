@@ -423,7 +423,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     static uint32_t missingSeq = 0;
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
-    if (updateStats(1, missingSeq)) {
+    if (missingSeq > 1) {
+        updateStats(1, missingSeq);
         ROS_WARN ("Autopilot: Losing %d images(Seq %d)", missingSeq, image_msg->header.seq);
     };
     lastSeq = image_msg->header.seq;
@@ -655,9 +656,6 @@ void RosInterface::initStats(void) {
 bool RosInterface::updateStats(uint32_t received, uint32_t missed) {
     totalImages+=received;
     missedImages+=missed;
-    if ((missedImages%10)==9) {
-        return true;
-    }
     return false;
 }
 
