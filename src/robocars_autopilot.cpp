@@ -301,12 +301,12 @@ void RosInterface::initSub () {
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
 }
 void RosInterface::initPub() {
-    autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 10);
-    autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 10);
-    stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 10);
+    autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 1);
+    autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 1);
+    stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 1);
 }
 
-static uint32_t lastLaneValue;
+static uint32_t lastMarkValue;
 
 template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
             int image_channels, int wanted_height, int wanted_width,
@@ -525,9 +525,9 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 break;
             }
             uint32_t predicted_denorm_Mark = 1+predicted_Mark;
-            float steeringFix = targetLane2Steering[lastLaneValue][predicted_denorm_Mark];
+            float steeringFix = targetLane2Steering[lastMarkValue][predicted_denorm_Mark];
             if (lane_guidance_mode && (steeringFix != 0.0)) {
-                ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d, Apply steering fix %1.2f", predicted_Steering, predicted_denorm_Mark, lastLaneValue,steeringFix);
+                ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d, Apply steering fix %1.2f", predicted_Steering, predicted_denorm_Mark, lastMarkValue,steeringFix);
                 predicted_Steering = steeringFix; 
             } else {
                 ROS_INFO ("Prediction : Steering %1.2f", predicted_Steering);
@@ -545,7 +545,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
 }
 
 void RosInterface::mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg){
-    lastLaneValue = msg->mark;
+    lastMarkValue = msg->mark;
 }
 
 void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg) {    
