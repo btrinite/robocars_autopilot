@@ -44,9 +44,10 @@ struct IdleStatusEvent              : BaseEvent { public: IdleStatusEvent() : Ba
 struct ManualDrivingEvent           : BaseEvent { public: ManualDrivingEvent() : BaseEvent("ManualDrivingEvent") {}; };
 struct AutonomousDrivingEvent       : BaseEvent { public: AutonomousDrivingEvent() : BaseEvent("AutonomousDrivingEvent") {}; };
 struct PredictEvent                 : BaseEvent { public: 
-    PredictEvent(const _Float32 steeringValue, const _Float32 throttlingValue) : steering_value(steeringValue), throttling_value(throttlingValue), BaseEvent("PredictEvent") {};
+    PredictEvent(const _Float32 steeringValue, const _Float32 throttlingValue, const __uint32_t seqNum) : steering_value(steeringValue), throttling_value(throttlingValue), seq_num(seqNum), BaseEvent("PredictEvent") {};
     _Float32 steering_value; 
     _Float32 throttling_value; 
+    __uint32_t seq_num;
     };
 
 class RobocarsStateMachine

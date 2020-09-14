@@ -142,7 +142,7 @@ class onRunningMode
         };
 
         void react( PredictEvent const & e) override { 
-            ri->publishPredict(e.steering_value, e.throttling_value);
+            ri->publishPredict(e.steering_value, e.throttling_value, e.seq_num);
             RobocarsStateMachine::react(e);
         };
 
@@ -250,19 +250,19 @@ uint32_t mapRange(uint32_t in1,uint32_t in2,uint32_t out1,uint32_t out2,uint32_t
   return out1 + ((value-in1)*(out2-out1))/(in2-in1);
 }
 
-void RosInterface::publishPredict(_Float32 steering, _Float32 throttling) {
+void RosInterface::publishPredict(_Float32 steering, _Float32 throttling, uint32_t seq) {
     robocars_msgs::robocars_autopilot_output steeringMsg;
     robocars_msgs::robocars_autopilot_output throttlingMsg;
 
     steeringMsg.header.stamp = ros::Time::now();
-    steeringMsg.header.seq=1;
+    steeringMsg.header.seq=seq;
     steeringMsg.header.frame_id = "pilotSteering";
     steeringMsg.norm = steering;
 
     autopilot_steering_pub.publish(steeringMsg);
 
     throttlingMsg.header.stamp = ros::Time::now();
-    throttlingMsg.header.seq=1;
+    throttlingMsg.header.seq=seq;
     throttlingMsg.header.frame_id = "pilotSteering";
     throttlingMsg.norm = throttling;
 
@@ -533,9 +533,9 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 ROS_INFO ("Prediction : Steering %1.2f", predicted_Steering);
             }
         }
-        send_event(PredictEvent(predicted_Steering,throttling_fixed_value));
+        send_event(PredictEvent(predicted_Steering,throttling_fixed_value, image_msg.header.seq));
     } else {
-        send_event(PredictEvent(0.5,0));
+        send_event(PredictEvent(0.0,0.0,0));
     }
 }
 
