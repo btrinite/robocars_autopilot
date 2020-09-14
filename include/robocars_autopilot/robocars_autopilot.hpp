@@ -108,7 +108,7 @@ class RosInterface
         void initSub();
         void initPub();
 
-        void publishPredict(_Float32 steering, _Float32 throttling);
+        void publishPredict(_Float32 steering, _Float32 throttling, __uint32_t seq);
 
         void initStats();
         void reportStats();
