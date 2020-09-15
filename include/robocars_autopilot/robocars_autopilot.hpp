@@ -44,9 +44,10 @@ struct IdleStatusEvent              : BaseEvent { public: IdleStatusEvent() : Ba
 struct ManualDrivingEvent           : BaseEvent { public: ManualDrivingEvent() : BaseEvent("ManualDrivingEvent") {}; };
 struct AutonomousDrivingEvent       : BaseEvent { public: AutonomousDrivingEvent() : BaseEvent("AutonomousDrivingEvent") {}; };
 struct PredictEvent                 : BaseEvent { public: 
-    PredictEvent(const _Float32 steeringValue, const _Float32 throttlingValue, const __uint32_t seqNum) : steering_value(steeringValue), throttling_value(throttlingValue), seq_num(seqNum), BaseEvent("PredictEvent") {};
+    PredictEvent(const _Float32 steeringValue, const _Float32 throttlingValue, const _Float32 brakingValue, const __uint32_t seqNum) : steering_value(steeringValue), throttling_value(throttlingValue), braking_value(brakingValue), seq_num(seqNum), BaseEvent("PredictEvent") {};
     _Float32 steering_value; 
     _Float32 throttling_value; 
+    _Float32 braking_value; 
     __uint32_t seq_num;
     };
 
@@ -108,7 +109,7 @@ class RosInterface
         void initSub();
         void initPub();
 
-        void publishPredict(_Float32 steering, _Float32 throttling, __uint32_t seq);
+        void publishPredict(_Float32 steering, _Float32 throttling, _Float32 braking, __uint32_t seq);
 
         void initStats();
         void reportStats();
@@ -121,6 +122,7 @@ class RosInterface
         ros::Subscriber state_sub;
         ros::Publisher autopilot_throttling_pub;
         ros::Publisher autopilot_steering_pub;
+        ros::Publisher autopilot_braking_pub;
 
 
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
@@ -146,17 +148,17 @@ class RosInterface
         int input;
         int output_steering;
         int output_throttling;
-        int output_mark;
+        int output_brake;
         int wanted_height;
         int wanted_width;
         int wanted_channels;
         TfLiteType model_input_type;
         TfLiteType model_output_steering_type;
         TfLiteType model_output_throttling_type;
-        TfLiteType model_output_mark_type;
+        TfLiteType model_output_brake_type;
         int output_steering_size;
         int output_throttling_size;
-        int output_mark_size;
+        int output_brake_size;
 
         bool modelLoaded=false;
 

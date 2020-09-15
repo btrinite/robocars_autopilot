@@ -100,17 +100,8 @@ static int loop_hz;
 static std::string model_filename;
 static std::string model_path;
 static float throttling_fixed_value;
-static bool lane_guidance_mode;
 
 bool edgetpu_found = false;
-
-/* Array to map [Wanted lane][actual lane] to steering control. 
-    Lane 0 is the left one
-    Lane 1 is the middle lane,
-    Lane 2 is the right one,
-    A steering value of -1 means to turn right, 1 means to turn left  
-*/
-float targetLane2Steering[3][3] = { {0.0 , -0.5 , -0.7}, {0.5 , 0.0 , -0.5}, {0.7 , 0.5 , 0.0}};
 
 class onRunningMode;
 class onIdle;
@@ -142,7 +133,7 @@ class onRunningMode
         };
 
         void react( PredictEvent const & e) override { 
-            ri->publishPredict(e.steering_value, e.throttling_value, e.seq_num);
+            ri->publishPredict(e.steering_value, e.throttling_value, e.braking_value, e.seq_num);
             RobocarsStateMachine::react(e);
         };
 
@@ -250,9 +241,10 @@ uint32_t mapRange(uint32_t in1,uint32_t in2,uint32_t out1,uint32_t out2,uint32_t
   return out1 + ((value-in1)*(out2-out1))/(in2-in1);
 }
 
-void RosInterface::publishPredict(_Float32 steering, _Float32 throttling, uint32_t seq) {
+void RosInterface::publishPredict(_Float32 steering, _Float32 throttling, _Float32 braking, uint32_t seq) {
     robocars_msgs::robocars_autopilot_output steeringMsg;
     robocars_msgs::robocars_autopilot_output throttlingMsg;
+    robocars_msgs::robocars_autopilot_output brakingMsg;
 
     steeringMsg.header.stamp = ros::Time::now();
     steeringMsg.header.seq=seq;
@@ -263,10 +255,17 @@ void RosInterface::publishPredict(_Float32 steering, _Float32 throttling, uint32
 
     throttlingMsg.header.stamp = ros::Time::now();
     throttlingMsg.header.seq=seq;
-    throttlingMsg.header.frame_id = "pilotSteering";
+    throttlingMsg.header.frame_id = "pilotThrottling";
     throttlingMsg.norm = throttling;
 
     autopilot_throttling_pub.publish(throttlingMsg);
+
+    brakingMsg.header.stamp = ros::Time::now();
+    brakingMsg.header.seq=seq;
+    brakingMsg.header.frame_id = "pilotBraking";
+    brakingMsg.norm = braking;
+
+    autopilot_braking_pub.publish(brakingMsg);
 }
 
 void RosInterface::initParam() {
@@ -279,17 +278,12 @@ void RosInterface::initParam() {
     if (!node_.hasParam("fix_autopilot_throttle_value")) {
         node_.setParam("fix_autopilot_throttle_value",0.35);
     }
-    if (!node_.hasParam("lane_guidance_mode")) {
-        node_.setParam("lane_guidance_mode",false);
-    }
-
 }
 void RosInterface::updateParam() {
     node_.getParam("loop_hz", loop_hz);
     node_.getParam("model_path", model_path);
     node_.getParam("model_filename", model_filename);
     node_.getParam("fix_autopilot_throttle_value", throttling_fixed_value);
-    node_.getParam("lane_guidance_mode", lane_guidance_mode);
 }
 
 
@@ -303,10 +297,11 @@ void RosInterface::initSub () {
 void RosInterface::initPub() {
     autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 1);
     autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 1);
+    autopilot_braking_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/brake", 1);
     stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 1);
 }
 
-static uint32_t lastMarkValue;
+static uint32_t lastBrakeValue;
 
 template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
             int image_channels, int wanted_height, int wanted_width,
@@ -509,31 +504,23 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         }
 
         if (interpreter->outputs().size()>2) {
-            int predicted_Mark=1;
-            switch (interpreter->tensor(output_mark)->type) {
+            int predicted_Brake=1;
+            switch (interpreter->tensor(output_brake)->type) {
                 case kTfLiteFloat32:
-                    predicted_Mark = unbind<float>(interpreter->typed_output_tensor<float>(2), output_mark_size,
-                        1, model_output_mark_type);
+                    predicted_Brake = unbind<float>(interpreter->typed_output_tensor<float>(2), output_brake_size,
+                        1, model_output_brake_type);
                 break;    
                 case kTfLiteInt8:
-                    predicted_Mark = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(2),
-                            output_mark_size, 1, model_output_mark_type);
+                    predicted_Brake = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(2),
+                            output_brake_size, 1, model_output_brake_type);
                     break;
                 case kTfLiteUInt8:
-                    predicted_Mark = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
-                            output_mark_size, 1, model_output_mark_type);
+                    predicted_Brake = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
+                            output_brake_size, 1, model_output_brake_type);
                 break;
             }
-            uint32_t predicted_denorm_Mark = 1+predicted_Mark;
-            float steeringFix = targetLane2Steering[lastMarkValue][predicted_denorm_Mark];
-            if (lane_guidance_mode && (steeringFix != 0.0)) {
-                ROS_INFO ("Prediction : Steering %1.2f Lane %1d, Wanted Lane %1d, Apply steering fix %1.2f", predicted_Steering, predicted_denorm_Mark, lastMarkValue,steeringFix);
-                predicted_Steering = steeringFix; 
-            } else {
-                ROS_INFO ("Prediction : Steering %1.2f", predicted_Steering);
-            }
         }
-        send_event(PredictEvent(predicted_Steering,throttling_fixed_value, image_msg->header.seq));
+        send_event(PredictEvent(predicted_Steering,throttling_fixed_value, predicted_Brake, image_msg->header.seq));
     } else {
         send_event(PredictEvent(0.0,0.0,0));
     }
@@ -545,7 +532,7 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
 }
 
 void RosInterface::mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg){
-    lastMarkValue = msg->mark;
+    lastBrakeValue = msg->mark;
 }
 
 void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg) {    
@@ -631,12 +618,12 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             ROS_INFO("Output Throttling Type : %d", model_output_throttling_type);
 
             if (interpreter->outputs().size()>2) {
-                output_mark = interpreter->outputs()[2];
-                output_dims = interpreter->tensor(output_mark)->dims;
-                output_mark_size = output_dims->data[output_dims->size - 1];
-                model_output_mark_type = interpreter->tensor(output_mark)->type;
-                ROS_INFO("Output Mark Size : %d", output_mark_size);
-                ROS_INFO("Output Mark Type : %d", model_output_mark_type);
+                output_brake = interpreter->outputs()[2];
+                output_dims = interpreter->tensor(output_brake)->dims;
+                output_brake_size = output_dims->data[output_dims->size - 1];
+                model_output_brake_type = interpreter->tensor(output_brake)->type;
+                ROS_INFO("Output Brake Size : %d", output_brake_size);
+                ROS_INFO("Output Brake Type : %d", model_output_brake_type);
             }
 
             modelLoaded = true;
