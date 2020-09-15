@@ -297,7 +297,7 @@ void RosInterface::initSub () {
 void RosInterface::initPub() {
     autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 1);
     autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 1);
-    autopilot_braking_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/brake", 1);
+    autopilot_braking_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/braking", 1);
     stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 1);
 }
 
