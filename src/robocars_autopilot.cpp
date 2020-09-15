@@ -503,8 +503,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             break;
         }
 
+        float predicted_Brake=0.0;
         if (interpreter->outputs().size()>2) {
-            int predicted_Brake=1;
             switch (interpreter->tensor(output_brake)->type) {
                 case kTfLiteFloat32:
                     predicted_Brake = unbind<float>(interpreter->typed_output_tensor<float>(2), output_brake_size,
@@ -522,7 +522,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         }
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value, predicted_Brake, image_msg->header.seq));
     } else {
-        send_event(PredictEvent(0.0,0.0,0));
+        send_event(PredictEvent(0.0,0.0,0.0,0));
     }
 }
 
