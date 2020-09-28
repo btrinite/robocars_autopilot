@@ -301,7 +301,7 @@ void RosInterface::initParam() {
     if (!node_.hasParam("autobrake_speed_thresh")) {
         node_.setParam("autobrake_speed_thresh",6.0);
     }
-    if (!node_.hasParam("autobrake_speed_thresh")) {
+    if (!node_.hasParam("autobrake_speed_max")) {
         node_.setParam("autobrake_speed_max",12.0);
     }
     if (!node_.hasParam("autobrake_enabled")) {
