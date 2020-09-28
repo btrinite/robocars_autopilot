@@ -247,6 +247,13 @@ uint32_t mapRange(uint32_t in1,uint32_t in2,uint32_t out1,uint32_t out2,uint32_t
   return out1 + ((value-in1)*(out2-out1))/(in2-in1);
 }
 
+_Float32 fmapRange(_Float32 in1,_Float32 in2,_Float32 out1,_Float32 out2,_Float32 value)
+{
+  if (value<in1) {value=in1;}
+  if (value>in2) {value=in2;}
+  return out1 + ((value-in1)*(out2-out1))/(in2-in1);
+}
+
 void RosInterface::publishPredict(_Float32 steering, _Float32 throttling, _Float32 braking, uint32_t seq) {
     robocars_msgs::robocars_autopilot_output steeringMsg;
     robocars_msgs::robocars_autopilot_output throttlingMsg;
@@ -548,7 +555,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             //Model do not provide brake, implement basic logic
             if (fabs(predicted_Steering)> autobrake_steering_thresh) {
                 if (lastSpeedValue>autobrake_speed_thresh) {
-                    predicted_Brake = - mapRange (autobrake_speed_thresh,autobrake_speed_max,0,1,lastSpeedValue) * autobrake_brake_factor;
+                    predicted_Brake = 0.0 - (smapRange (autobrake_speed_thresh,autobrake_speed_max,0,1,lastSpeedValue) * autobrake_brake_factor);
                     ROS_INFO("Autopilot : apply brake: %f", predicted_Brake);
                 }
             }
