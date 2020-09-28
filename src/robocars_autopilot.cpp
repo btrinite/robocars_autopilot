@@ -102,6 +102,8 @@ static int loop_hz;
 static std::string model_filename;
 static std::string model_path;
 static float throttling_fixed_value;
+static float throttling_fullspeed_fixed_value;
+static float brake_fixed_value;
 static float autobrake_steering_thresh;
 static float autobrake_brake_factor;
 static float autobrake_speed_max;
@@ -109,6 +111,7 @@ static float autobrake_speed_thresh;
 
 bool edgetpu_found = false;
 bool autobrake_enabled = false;
+bool throttle_on_mark = false;
 
 class onRunningMode;
 class onIdle;
@@ -292,6 +295,12 @@ void RosInterface::initParam() {
     if (!node_.hasParam("fix_autopilot_throttle_value")) {
         node_.setParam("fix_autopilot_throttle_value",0.35);
     }
+    if (!node_.hasParam("fix_autopilot_full_throttle_value")) {
+        node_.setParam("fix_autopilot_full_throttle_value",0.55);
+    }
+    if (!node_.hasParam("fix_autopilot_brake_value")) {
+        node_.setParam("fix_autopilot_brake_value",0.2);
+    }
     if (!node_.hasParam("autobrake_steering_thresh")) {
         node_.setParam("autobrake_steering_thresh",0.2);
     }
@@ -307,6 +316,9 @@ void RosInterface::initParam() {
     if (!node_.hasParam("autobrake_enabled")) {
         node_.setParam("autobrake_enabled",false);
     }
+    if (!node_.hasParam("throttle_on_mark")) {
+        node_.setParam("throttle_on_mark",false);
+    }
 
 }
 void RosInterface::updateParam() {
@@ -314,11 +326,14 @@ void RosInterface::updateParam() {
     node_.getParam("model_path", model_path);
     node_.getParam("model_filename", model_filename);
     node_.getParam("fix_autopilot_throttle_value", throttling_fixed_value);
+    node_.getParam("fix_autopilot_full_throttle_value", throttling_fullspeed_fixed_value);
+    node_.getParam("fix_autopilot_brake_value", brake_fixed_value);
     node_.getParam("autobrake_steering_thresh", autobrake_steering_thresh);
     node_.getParam("autobrake_brake_factor", autobrake_brake_factor);
     node_.getParam("autobrake_speed_thresh", autobrake_speed_thresh);
     node_.getParam("autobrake_speed_max", autobrake_speed_max);
     node_.getParam("autobrake_enabled", autobrake_enabled);
+    node_.getParam("throttle_on_mark", throttle_on_mark);
 }
 
 
@@ -453,6 +468,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     static uint32_t lastSeq = 0;
     cv_bridge::CvImagePtr cv_ptr;
     static uint32_t missingSeq = 0;
+    static float lastThrottle = throttling_fixed_value;
+    static float lastBrake = 0.0;
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
     if (missingSeq > 1) {
@@ -559,6 +576,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             }
         }
         if (autobrake_enabled == true) {
+            /*
             //Model do not provide brake, implement basic logic
             if (fabs(predicted_Steering)> autobrake_steering_thresh) {
                 if (lastSpeedValue>autobrake_speed_thresh) {
@@ -568,13 +586,26 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                     ROS_INFO("Autopilot : apply brake %lf", predicted_Brake);
                 }
             }
-            filtered_Brake = predicted_Brake;
-        } else {
-            if (predicted_Brake > -1.0) {
-                ROS_INFO("Autopilot : Predicted Brake %lf", predicted_Brake);
+            */
+            if (throttle_on_mark == true) {
+                lastBrake = 0.0;
+                if (predicted_Brake == 0.0) {
+                    //Brake zone
+                    if (lastSpeedValue>autobrake_speed_thresh) {
+                        lastBrake = brake_fixed_value;
+                    }
+                    lastThrottle = throttling_fixed_value;                
+                } else if (predicted_Brake == 1.0) {
+                    //Full speed zone
+                    lastThrottle = throttling_fullspeed_fixed_value;
+                } else {
+                    // No Brake, No acceleration
+                }
+                send_event(PredictEvent(predicted_Steering,lastThrottle, lastBrake, image_msg->header.seq));
             }
+        } else {
+            send_event(PredictEvent(predicted_Steering,throttling_fixed_value, 0.0, image_msg->header.seq));
         }
-        send_event(PredictEvent(predicted_Steering,throttling_fixed_value, filtered_Brake, image_msg->header.seq));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0));
     }
