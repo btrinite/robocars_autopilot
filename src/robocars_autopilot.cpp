@@ -570,7 +570,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             }
             filtered_Brake = predicted_Brake;
         } else {
-            if (predicted_Brake > 0.0) {
+            if (predicted_Brake > -1.0) {
                 ROS_INFO("Autopilot : Predicted Brake %lf", predicted_Brake);
             }
         }
