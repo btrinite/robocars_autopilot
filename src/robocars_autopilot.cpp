@@ -338,7 +338,7 @@ void RosInterface::initPub() {
 }
 
 static uint32_t lastBrakeValue = 0;
-static uint32_t lastSpeedValue = 0;
+static float lastSpeedValue = 0;
 
 template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
             int image_channels, int wanted_height, int wanted_width,
