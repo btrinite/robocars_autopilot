@@ -591,7 +591,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 lastBrake = 0.0;
                 if (predicted_Brake == 0.0) {
                     //Brake zone
-                    if (lastSpeedValue>autobrake_speed_thresh) {
+                    if (lastThrottle==throttling_fullspeed_fixed_value) {
                         lastBrake = brake_fixed_value;
                     }
                     lastThrottle = throttling_fixed_value;                
