@@ -68,6 +68,8 @@
 #include <sensor_msgs/Image.h>
 #include <sensor_msgs/CameraInfo.h>
 
+#include <geometry_msgs/Twist.h>
+
 #include <image_transport/image_transport.h>
 #include <cv_bridge/cv_bridge.h>
 
@@ -292,6 +294,7 @@ void RosInterface::initSub () {
     sub_image = it->subscribe("/front_video_resize/image", 1, &RosInterface::callbackNoCameraInfo, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 1, &RosInterface::state_msg_cb, this);
     mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/mark", 1, &RosInterface::mark_msg_cb, this);
+    speed_sub = node_.subscribe<geometry_msgs::Twist>("/gym/speed", 1, &RosInterface::speed_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
 }
 void RosInterface::initPub() {
@@ -301,7 +304,8 @@ void RosInterface::initPub() {
     stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 1);
 }
 
-static uint32_t lastBrakeValue;
+static uint32_t lastBrakeValue = 0;
+static uint32_t lastSpeedValue = 0;
 
 template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
             int image_channels, int wanted_height, int wanted_width,
@@ -533,6 +537,10 @@ void RosInterface::callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& imag
 
 void RosInterface::mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg){
     lastBrakeValue = msg->mark;
+}
+
+void RosInterface::mark_msg_cb(const geometry_msgs::Twist::ConstPtr& msg){
+    lastSpeedValue = msg->linear.x;
 }
 
 void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg) {    
