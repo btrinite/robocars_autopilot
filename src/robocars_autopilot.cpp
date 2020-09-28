@@ -541,6 +541,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         }
 
         float predicted_Brake=0.0;
+        float filtered_Brake=0.0;
         if (interpreter->outputs().size()>2) {
             switch (interpreter->tensor(output_brake)->type) {
                 case kTfLiteFloat32:
@@ -567,12 +568,13 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                     ROS_INFO("Autopilot : apply brake %lf", predicted_Brake);
                 }
             }
+            filtered_Brake = predicted_Brake;
         } else {
             if (predicted_Brake > 0.0) {
                 ROS_INFO("Autopilot : Predicted Brake %lf", predicted_Brake);
             }
         }
-        send_event(PredictEvent(predicted_Steering,throttling_fixed_value, predicted_Brake, image_msg->header.seq));
+        send_event(PredictEvent(predicted_Steering,throttling_fixed_value, filtered_Brake, image_msg->header.seq));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0));
     }
