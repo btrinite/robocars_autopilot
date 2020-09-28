@@ -548,7 +548,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             //Model do not provide brake, implement basic logic
             if (fabs(predicted_Steering)> autobrake_steering_thresh) {
                 if (lastSpeedValue>autobrake_speed_thresh) {
-                    predicted_Brake = mapRange (autobrake_speed_thresh,autobrake_speed_max,0,-1,lastSpeedValue) * autobrake_brake_factor;
+                    predicted_Brake = - mapRange (autobrake_speed_thresh,autobrake_speed_max,0,1,lastSpeedValue) * autobrake_brake_factor;
                     ROS_INFO("Autopilot : apply brake: %f", predicted_Brake);
                 }
             }
