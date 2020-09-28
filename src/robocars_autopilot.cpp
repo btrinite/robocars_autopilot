@@ -539,7 +539,7 @@ void RosInterface::mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg
     lastBrakeValue = msg->mark;
 }
 
-void RosInterface::mark_msg_cb(const geometry_msgs::Twist::ConstPtr& msg){
+void RosInterface::speed_msg_cb(const geometry_msgs::Twist::ConstPtr& msg){
     lastSpeedValue = msg->linear.x;
 }
 
