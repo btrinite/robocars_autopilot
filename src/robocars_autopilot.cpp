@@ -108,6 +108,7 @@ static float autobrake_speed_max;
 static float autobrake_speed_thresh;
 
 bool edgetpu_found = false;
+bool autobrake_enabled = false;
 
 class onRunningMode;
 class onIdle;
@@ -303,6 +304,9 @@ void RosInterface::initParam() {
     if (!node_.hasParam("autobrake_speed_thresh")) {
         node_.setParam("autobrake_speed_max",12.0);
     }
+    if (!node_.hasParam("autobrake_enabled")) {
+        node_.setParam("autobrake_enabled",false);
+    }
 
 }
 void RosInterface::updateParam() {
@@ -314,6 +318,7 @@ void RosInterface::updateParam() {
     node_.getParam("autobrake_brake_factor", autobrake_brake_factor);
     node_.getParam("autobrake_speed_thresh", autobrake_speed_thresh);
     node_.getParam("autobrake_speed_max", autobrake_speed_max);
+    node_.getParam("autobrake_enabled", autobrake_enabled);
 }
 
 
@@ -552,11 +557,13 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 break;
             }
         } else {
-            //Model do not provide brake, implement basic logic
-            if (fabs(predicted_Steering)> autobrake_steering_thresh) {
-                if (lastSpeedValue>autobrake_speed_thresh) {
-                    predicted_Brake = 0.0 - (smapRange (autobrake_speed_thresh,autobrake_speed_max,0,1,lastSpeedValue) * autobrake_brake_factor);
-                    ROS_INFO("Autopilot : apply brake: %f", predicted_Brake);
+            if (autobrake_enabled == true) {
+                //Model do not provide brake, implement basic logic
+                if (fabs(predicted_Steering)> autobrake_steering_thresh) {
+                    if (lastSpeedValue>autobrake_speed_thresh) {
+                        predicted_Brake = 0.0 - (smapRange (autobrake_speed_thresh,autobrake_speed_max,0,1,lastSpeedValue) * autobrake_brake_factor);
+                        ROS_INFO("Autopilot : apply brake: %f", predicted_Brake);
+                    }
                 }
             }
         }
