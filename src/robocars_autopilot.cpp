@@ -103,7 +103,8 @@ static std::string model_filename;
 static std::string model_path;
 static float throttling_fixed_value;
 static float throttling_fullspeed_fixed_value;
-static float brake_fixed_value;
+static float brake_fixed_1_value;
+static float brake_fixed_2_value;
 static float autobrake_steering_thresh;
 static float autobrake_brake_factor;
 static float autobrake_speed_max;
@@ -298,8 +299,11 @@ void RosInterface::initParam() {
     if (!node_.hasParam("fix_autopilot_full_throttle_value")) {
         node_.setParam("fix_autopilot_full_throttle_value",0.55);
     }
-    if (!node_.hasParam("fix_autopilot_brake_value")) {
-        node_.setParam("fix_autopilot_brake_value",0.2);
+    if (!node_.hasParam("fix_autopilot_brake_1_value")) {
+        node_.setParam("fix_autopilot_brake_1_value",0.1);
+    }
+    if (!node_.hasParam("fix_autopilot_brake_2_value")) {
+        node_.setParam("fix_autopilot_brake_2_value",0.6);
     }
     if (!node_.hasParam("autobrake_steering_thresh")) {
         node_.setParam("autobrake_steering_thresh",0.2);
@@ -327,7 +331,8 @@ void RosInterface::updateParam() {
     node_.getParam("model_filename", model_filename);
     node_.getParam("fix_autopilot_throttle_value", throttling_fixed_value);
     node_.getParam("fix_autopilot_full_throttle_value", throttling_fullspeed_fixed_value);
-    node_.getParam("fix_autopilot_brake_value", brake_fixed_value);
+    node_.getParam("fix_autopilot_brake_1_value", brake_fixed_1_value);
+    node_.getParam("fix_autopilot_brake_2_value", brake_fixed_2_value);
     node_.getParam("autobrake_steering_thresh", autobrake_steering_thresh);
     node_.getParam("autobrake_brake_factor", autobrake_brake_factor);
     node_.getParam("autobrake_speed_thresh", autobrake_speed_thresh);
@@ -592,7 +597,9 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 if (predicted_Brake == 0.0) {
                     //Brake zone
                     if (lastThrottle==throttling_fullspeed_fixed_value) {
-                        lastBrake = brake_fixed_value;
+                        lastBrake = brake_fixed_2_value;
+                    } else {
+                        lastBrake = brake_fixed_1_value;
                     }
                     lastThrottle = throttling_fixed_value;                
                 } else if (predicted_Brake == 1.0) {
