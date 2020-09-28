@@ -102,6 +102,10 @@ static int loop_hz;
 static std::string model_filename;
 static std::string model_path;
 static float throttling_fixed_value;
+static float autobrake_steering_thresh;
+static float autobrake_brake_factor;
+static float autobrake_speed_max;
+static float autobrake_speed_thresh;
 
 bool edgetpu_found = false;
 
@@ -280,12 +284,29 @@ void RosInterface::initParam() {
     if (!node_.hasParam("fix_autopilot_throttle_value")) {
         node_.setParam("fix_autopilot_throttle_value",0.35);
     }
+    if (!node_.hasParam("autobrake_steering_thresh")) {
+        node_.setParam("autobrake_steering_thresh",0.2);
+    }
+    if (!node_.hasParam("autobrake_brake_factor")) {
+        node_.setParam("autobrake_brake_factor",1.0);
+    }
+    if (!node_.hasParam("autobrake_speed_thresh")) {
+        node_.setParam("autobrake_speed_thresh",6.0);
+    }
+    if (!node_.hasParam("autobrake_speed_thresh")) {
+        node_.setParam("autobrake_speed_max",12.0);
+    }
+
 }
 void RosInterface::updateParam() {
     node_.getParam("loop_hz", loop_hz);
     node_.getParam("model_path", model_path);
     node_.getParam("model_filename", model_filename);
     node_.getParam("fix_autopilot_throttle_value", throttling_fixed_value);
+    node_.getParam("autobrake_steering_thresh", autobrake_steering_thresh);
+    node_.getParam("autobrake_brake_factor", autobrake_brake_factor);
+    node_.getParam("autobrake_speed_thresh", autobrake_speed_thresh);
+    node_.getParam("autobrake_speed_max", autobrake_speed_max);
 }
 
 
@@ -522,6 +543,14 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                     predicted_Brake = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
                             output_brake_size, 1, model_output_brake_type);
                 break;
+            }
+        } else {
+            //Model do not provide brake, implement basic logic
+            if (fabs(predicted_Steering)> autobrake_steering_thresh) {
+                if (lastSpeedValue>autobrake_speed_thresh) {
+                    predicted_Brake = mapRange (autobrake_speed_thresh,autobrake_speed_max,0,1,(lastSpeedValue-autobrake_speed_thresh)) * autobrake_brake_factor;
+                    ROS_INFO("Autopilot : apply brake: %f", predicted_Brake);
+                }
             }
         }
         send_event(PredictEvent(predicted_Steering,throttling_fixed_value, predicted_Brake, image_msg->header.seq));
