@@ -150,17 +150,17 @@ class RosInterface
         int input;
         int output_steering;
         int output_throttling;
-        int output_brake;
+        int output_mark;
         int wanted_height;
         int wanted_width;
         int wanted_channels;
         TfLiteType model_input_type;
         TfLiteType model_output_steering_type;
         TfLiteType model_output_throttling_type;
-        TfLiteType model_output_brake_type;
+        TfLiteType model_output_mark_type;
         int output_steering_size;
         int output_throttling_size;
-        int output_brake_size;
+        int output_mark_size;
 
         bool modelLoaded=false;
 

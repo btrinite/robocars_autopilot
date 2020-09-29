@@ -113,6 +113,8 @@ static float autobrake_speed_thresh;
 bool edgetpu_found = false;
 bool autobrake_enabled = false;
 bool throttle_on_mark = false;
+bool fix_throttling = false;
+bool model_based_throttling = false;
 
 class onRunningMode;
 class onIdle;
@@ -323,6 +325,14 @@ void RosInterface::initParam() {
     if (!node_.hasParam("throttle_on_mark")) {
         node_.setParam("throttle_on_mark",false);
     }
+    if (!node_.hasParam("fix_throttling")) {
+        node_.setParam("fix_throttling",true);
+    }
+    if (!node_.hasParam("model_based_throttling")) {
+        node_.setParam("model_based_throttling",false);
+    }
+
+
 
 }
 void RosInterface::updateParam() {
@@ -333,6 +343,8 @@ void RosInterface::updateParam() {
     node_.getParam("fix_autopilot_full_throttle_value", throttling_fullspeed_fixed_value);
     node_.getParam("fix_autopilot_brake_1_value", brake_fixed_1_value);
     node_.getParam("fix_autopilot_brake_2_value", brake_fixed_2_value);
+    node_.getParam("fix_throttling", fix_throttling);
+    node_.getParam("model_based_throttling", model_based_throttling);
     node_.getParam("autobrake_steering_thresh", autobrake_steering_thresh);
     node_.getParam("autobrake_brake_factor", autobrake_brake_factor);
     node_.getParam("autobrake_speed_thresh", autobrake_speed_thresh);
@@ -475,6 +487,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     static uint32_t missingSeq = 0;
     static float lastThrottle = throttling_fixed_value;
     static float lastBrake = 0.0;
+    float throttlingDecision = 0.0;
+    float brakingDecision = 0.0;
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
     if (missingSeq > 1) {
@@ -562,24 +576,51 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             break;
         }
 
-        float predicted_Brake=0.0;
+        float predicted_Throttling;
+        switch (interpreter->tensor(output_throttling)->type) {
+            case kTfLiteFloat32:
+                predicted_Throttling = unbind<float>(interpreter->typed_tensor<float>(output_throttling),
+                output_throttling_size, 1, model_output_throttling_type);
+            break;    
+            case kTfLiteInt8:
+                predicted_Throttling = unbind<int8_t>(interpreter->typed_tensor<int8_t>(output_throttling),
+                        output_throttling_size, 1, model_output_throttling_type);
+                break;
+            case kTfLiteUInt8:
+                predicted_Throttling = unbind<uint8_t>(interpreter->typed_tensor<uint8_t>(output_throttling),
+                        output_throttling_size, 1, model_output_throttling_type);
+                predicted_Throttling = -1.0 + (predicted_Throttling*2.0);        
+            break;
+        }
+
+        float predicted_Mark=0.0;
         float filtered_Brake=0.0;
         if (interpreter->outputs().size()>2) {
-            switch (interpreter->tensor(output_brake)->type) {
+            switch (interpreter->tensor(output_mark)->type) {
                 case kTfLiteFloat32:
-                    predicted_Brake = unbind<float>(interpreter->typed_output_tensor<float>(2), output_brake_size,
-                        1, model_output_brake_type);
+                    predicted_Mark = unbind<float>(interpreter->typed_tensor<float>(output_mark), output_mark_size,
+                        1, model_output_mark_type);
                 break;    
                 case kTfLiteInt8:
-                    predicted_Brake = unbind<int8_t>(interpreter->typed_output_tensor<int8_t>(2),
-                            output_brake_size, 1, model_output_brake_type);
+                    predicted_Mark = unbind<int8_t>(interpreter->typed_tensor<int8_t>(output_mark),
+                            output_mark_size, 1, model_output_mark_type);
                     break;
                 case kTfLiteUInt8:
-                    predicted_Brake = unbind<uint8_t>(interpreter->typed_output_tensor<uint8_t>(2),
-                            output_brake_size, 1, model_output_brake_type);
+                    predicted_Mark = unbind<uint8_t>(interpreter->typed_tensor<uint8_t>(output_mark),
+                            output_mark_size, 1, model_output_mark_type);
                 break;
             }
         }
+        throttlingDecision = 0.0;
+        brakingDecision = 0.0;
+
+        // Throttling and braking decision
+        if (fix_throttling == true) {
+            throttlingDecision = throttling_fixed_value;
+        } else if (model_based_throttling == true) {
+            throttlingDecision = fmin(0.1,predicted_Throttling);
+        }
+
         if (autobrake_enabled == true) {
             /*
             //Model do not provide brake, implement basic logic
@@ -587,14 +628,14 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 if (lastSpeedValue>autobrake_speed_thresh) {
                     ROS_INFO("Autopilot : autobrake: steering %lf speed %lf", predicted_Steering, lastSpeedValue);
                     float reMappedpeed = fmapRange (autobrake_speed_thresh,autobrake_speed_max,0.0,1.0,lastSpeedValue);
-                    predicted_Brake = 0.0 - (reMappedpeed * autobrake_brake_factor);
-                    ROS_INFO("Autopilot : apply brake %lf", predicted_Brake);
+                    predicted_Mark = 0.0 - (reMappedpeed * autobrake_brake_factor);
+                    ROS_INFO("Autopilot : apply brake %lf", predicted_Mark);
                 }
             }
             */
             if (throttle_on_mark == true) {
                 lastBrake = 0.0;
-                if (predicted_Brake == 0.0) {
+                if (predicted_Mark == 0.0) {
                     //Brake zone
                     if (lastThrottle==throttling_fullspeed_fixed_value) {
                         lastBrake = brake_fixed_2_value;
@@ -602,17 +643,17 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                         lastBrake = brake_fixed_1_value;
                     }
                     lastThrottle = throttling_fixed_value;                
-                } else if (predicted_Brake == 1.0) {
+                } else if (predicted_Mark == 1.0) {
                     //Full speed zone
                     lastThrottle = throttling_fullspeed_fixed_value;
                 } else {
                     // No Brake, No acceleration
                 }
-                send_event(PredictEvent(predicted_Steering,lastThrottle, lastBrake, image_msg->header.seq));
+                throttlingDecision = lastThrottle;
+                brakingDecision = lastBrake;
             }
-        } else {
-            send_event(PredictEvent(predicted_Steering,throttling_fixed_value, 0.0, image_msg->header.seq));
         }
+        send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0));
     }
@@ -714,12 +755,12 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
             ROS_INFO("Output Throttling Type : %d", model_output_throttling_type);
 
             if (interpreter->outputs().size()>2) {
-                output_brake = interpreter->outputs()[2];
-                output_dims = interpreter->tensor(output_brake)->dims;
-                output_brake_size = output_dims->data[output_dims->size - 1];
-                model_output_brake_type = interpreter->tensor(output_brake)->type;
-                ROS_INFO("Output Brake Size : %d", output_brake_size);
-                ROS_INFO("Output Brake Type : %d", model_output_brake_type);
+                output_mark = interpreter->outputs()[2];
+                output_dims = interpreter->tensor(output_mark)->dims;
+                output_mark_size = output_dims->data[output_dims->size - 1];
+                model_output_mark_type = interpreter->tensor(output_mark)->type;
+                ROS_INFO("Output Mark Size : %d", output_mark_size);
+                ROS_INFO("Output Mark Type : %d", model_output_mark_type);
             }
 
             modelLoaded = true;
