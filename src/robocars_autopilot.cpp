@@ -359,7 +359,7 @@ void RosInterface::initSub () {
     sub_image = it->subscribe("/front_video_resize/image", 1, &RosInterface::callbackNoCameraInfo, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 1, &RosInterface::state_msg_cb, this);
     mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/mark", 1, &RosInterface::mark_msg_cb, this);
-    speed_sub = node_.subscribe<geometry_msgs::Twist>("/gym/speed", 1, &RosInterface::speed_msg_cb, this);
+    speed_sub = node_.subscribe<geometry_msgs::Twist>("/telemetry/speed", 1, &RosInterface::speed_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
 }
 void RosInterface::initPub() {
