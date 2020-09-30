@@ -112,7 +112,7 @@ static float autobrake_speed_thresh;
 
 bool edgetpu_found = false;
 bool autobrake_enabled = false;
-bool throttle_on_mark = false;
+bool throttle_and_brake_on_mark = false;
 bool fix_throttling = false;
 bool model_based_throttling = false;
 
@@ -322,8 +322,8 @@ void RosInterface::initParam() {
     if (!node_.hasParam("autobrake_enabled")) {
         node_.setParam("autobrake_enabled",false);
     }
-    if (!node_.hasParam("throttle_on_mark")) {
-        node_.setParam("throttle_on_mark",false);
+    if (!node_.hasParam("throttle_and_brake_on_mark")) {
+        node_.setParam("throttle_and_brake_on_mark",false);
     }
     if (!node_.hasParam("fix_throttling")) {
         node_.setParam("fix_throttling",true);
@@ -350,7 +350,7 @@ void RosInterface::updateParam() {
     node_.getParam("autobrake_speed_thresh", autobrake_speed_thresh);
     node_.getParam("autobrake_speed_max", autobrake_speed_max);
     node_.getParam("autobrake_enabled", autobrake_enabled);
-    node_.getParam("throttle_on_mark", throttle_on_mark);
+    node_.getParam("throttle_and_brake_on_mark", throttle_and_brake_on_mark);
 }
 
 
@@ -618,7 +618,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         if (fix_throttling == true) {
             throttlingDecision = throttling_fixed_value;
         } else if (model_based_throttling == true) {
-            throttlingDecision = fmin(0.1,predicted_Throttling);
+            throttlingDecision = fmax(0.1,predicted_Throttling);
         }
 
         if (autobrake_enabled == true) {
@@ -633,7 +633,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 }
             }
             */
-            if (throttle_on_mark == true) {
+            if (throttle_and_brake_on_mark == true) {
                 lastBrake = 0.0;
                 if (predicted_Mark == 0.0) {
                     //Brake zone
