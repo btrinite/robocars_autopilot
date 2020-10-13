@@ -128,7 +128,7 @@ class RosInterface
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
         void callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_msg);
         void mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg);
-        void speed_msg_cb(const geometry_msgs::Twist::ConstPtr& msg);
+        void telem_msg_cb(const robocars_msgs::robocars_telemetry::ConstPtr& msg);
         bool reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
         template <class T> void resize (T* out, uint8_t* in, int image_height, int image_width,
@@ -138,7 +138,7 @@ class RosInterface
                TfLiteType input_type);
 
         ros::Subscriber mark_sub;
-        ros::Subscriber speed_sub;
+        ros::Subscriber telem_sub;
         image_transport::ImageTransport * it;
         image_transport::CameraSubscriber sub_image_and_camera;
         image_transport::Subscriber sub_image;
