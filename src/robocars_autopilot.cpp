@@ -426,7 +426,7 @@ template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_heig
   auto output_number_of_pixels = wanted_height * wanted_width * wanted_channels;
 
   for (int i = 0; i < output_number_of_pixels; i++) {
-    switch (model_input_type) {
+    switch (model_input_img_type) {
       case kTfLiteFloat32:
         out[i] = output[i];
         break;
@@ -497,6 +497,11 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     lastSeq = image_msg->header.seq;
 
     if (modelLoaded) {
+
+        const std::vector<int> inputs = interpreter->inputs();
+        const std::vector<int> outputs = interpreter->outputs();
+
+        // provide image input
         int image_width = 160;
         int image_height = 120;
         int image_channels = 3; 
@@ -517,9 +522,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             return;
         }
 
-        const std::vector<int> inputs = interpreter->inputs();
-        const std::vector<int> outputs = interpreter->outputs();
-        switch (model_input_type) {
+        switch (model_input_img_type) {
             case kTfLiteFloat32:
             {
                 /* resize<float>(interpreter->typed_tensor<float>(input), in.data(),
@@ -529,7 +532,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 /*std::transform(in.begin(), in.end(), interpreter->typed_tensor<float>(input),
                  [](uchar i) { return i / 254; });
                 */
-                float* fillInput = interpreter->typed_tensor<float>(input);
+                float* fillInput = interpreter->typed_tensor<float>(input_img);
                 for (int i=0; i<in.size();i++) {
                     //fillInput[i] = ((float)in[i]-127.5)/127.5;
                     fillInput[i] = (float)in[i];
@@ -538,7 +541,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             break;
             case kTfLiteInt8:
             {
-                resize<int8_t>(interpreter->typed_tensor<int8_t>(input), in.data(),
+                resize<int8_t>(interpreter->typed_tensor<int8_t>(input_img), in.data(),
                     image_height, image_width, image_channels, wanted_height,
                     wanted_width, wanted_channels);
             }
@@ -546,7 +549,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             case kTfLiteUInt8:
             {
                 /*WIP resize code (based on tf operators) not working on edge tpu for now, since image input is already at the correct size, just copy image as is in tensor*/
-                  uint8_t* fillInput = interpreter->typed_input_tensor<uint8_t>(input);
+                  uint8_t* fillInput = interpreter->typed_input_tensor<uint8_t>(input_img);
                   std::memcpy(fillInput, in.data(), in.size());
                 /*
                 resize<uint8_t>(interpreter->typed_input_tensor<uint8_t>(input), in.data(),
@@ -555,6 +558,31 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                     */
             }
             break;
+        }
+
+        if (interpreter->nodes_size()>1) {
+            //provide telem speed input
+
+            switch (model_input_telem_speed_type) {
+                case kTfLiteFloat32:
+                {
+                    float* fillInput = interpreter->typed_tensor<float>(input_telem_speed);
+                    fillInput[0] = (float)lastSpeedValue;
+                }
+                break;
+                case kTfLiteInt8:
+                {
+                    int8_t* fillInput = interpreter->typed_tensor<int8_t>(input_telem_speed);
+                    fillInput[0] = (int8_t)(lastSpeedValue; * 256)
+                }
+                break;
+                case kTfLiteUInt8:
+                {
+                    uint8_t* fillInput = interpreter->typed_tensor<uint8_t>(input_telem_speed);
+                    fillInput[0] = (uint8_t)(lastSpeedValue; * 128)
+                }
+                break;
+            }
         }
 
         interpreter->Invoke(); // this is where the magick happen
@@ -722,20 +750,38 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
                 ROS_INFO("  output(%d) name: %s", idx, interpreter->GetOutputName(idx));
             }
 
-            input = interpreter->inputs()[0];
+            input_img = interpreter->inputs()[0];
             const auto& required_shape = coral::GetInputShape(*interpreter, 0);
 
-            TfLiteIntArray* dims = interpreter->tensor(input)->dims;
-            model_input_type = interpreter->tensor(input)->type;
+            TfLiteIntArray* dims = interpreter->tensor(input_img)->dims;
+            model_input_img_type = interpreter->tensor(input_img)->type;
 
-            ROS_INFO("Input idx: %d", input);
-            ROS_INFO("wanted_height: %d", required_shape[0]);
-            ROS_INFO("wanted_width: %d", required_shape[1]);
-            ROS_INFO("wanted_channels: %d", required_shape[2]);
-            ROS_INFO("Input Type : %d (%d %d %d)", model_input_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
+            ROS_INFO("Image Input idx: %d", input_img);
+            ROS_INFO("expected height: %d", required_shape[0]);
+            ROS_INFO("expected width: %d", required_shape[1]);
+            ROS_INFO("expected channels: %d", required_shape[2]);
+            ROS_INFO("Input Type : %d (%d %d %d)", model_input_img_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
             
-            if ((model_input_type != kTfLiteFloat32) && (model_input_type != kTfLiteInt8) && (model_input_type!= kTfLiteUInt8)) {
-                ROS_INFO("cannot handle input type %d", interpreter->tensor(input)->type);
+            if ((model_input_img_type != kTfLiteFloat32) && (model_input_img_type != kTfLiteInt8) && (model_input_img_type!= kTfLiteUInt8)) {
+                ROS_INFO("cannot handle input type %d", interpreter->tensor(input_img)->type);
+            }
+
+            if (interpreter->nodes_size()>1) {
+
+                input_telem_speed = interpreter->inputs()[1];
+                const auto& required_shape = coral::GetInputShape(*interpreter, 0);
+
+                TfLiteIntArray* dims = interpreter->tensor(input_telem_speed)->dims;
+                model_input_telem_speed_type = interpreter->tensor(input_telem_speed)->type;
+
+                ROS_INFO("Telem Speed Input idx: %d", input_img);
+                ROS_INFO("expected size: %d", required_shape[0]);
+                ROS_INFO("Input Type : %d (%d %d %d)", model_input_telem_speed_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
+                
+                if ((model_input_telem_speed_type != kTfLiteFloat32) && (model_input_telem_speed_type != kTfLiteInt8) && (model_input_telem_speed_type!= kTfLiteUInt8)) {
+                    ROS_INFO("cannot handle input type %d", interpreter->tensor(input_telem_speed)->type);
+                }
+
             }
 
             output_steering = interpreter->outputs()[0];

@@ -147,14 +147,16 @@ class RosInterface
         std::unique_ptr<tflite::FlatBufferModel> model;
         std::unique_ptr<tflite::Interpreter> interpreter;
         std::shared_ptr<edgetpu::EdgeTpuContext> edgetpu_context;
-        int input;
+        int input_img;
+        int intpu_telem_speed;
         int output_steering;
         int output_throttling;
         int output_mark;
         int wanted_height;
         int wanted_width;
         int wanted_channels;
-        TfLiteType model_input_type;
+        TfLiteType model_input_img_type;
+        TfLiteType model_input_telem_speed_type;
         TfLiteType model_output_steering_type;
         TfLiteType model_output_throttling_type;
         TfLiteType model_output_mark_type;
