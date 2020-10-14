@@ -573,13 +573,13 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 case kTfLiteInt8:
                 {
                     int8_t* fillInput = interpreter->typed_tensor<int8_t>(input_telem_speed);
-                    fillInput[0] = (int8_t)(lastSpeedValue * 256)
+                    fillInput[0] = (int8_t)(lastSpeedValue * 256);
                 }
                 break;
                 case kTfLiteUInt8:
                 {
                     uint8_t* fillInput = interpreter->typed_tensor<uint8_t>(input_telem_speed);
-                    fillInput[0] = (uint8_t)(lastSpeedValue * 128)
+                    fillInput[0] = (uint8_t)(lastSpeedValue * 128);
                 }
                 break;
             }
