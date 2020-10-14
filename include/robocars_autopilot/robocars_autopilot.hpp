@@ -148,7 +148,7 @@ class RosInterface
         std::unique_ptr<tflite::Interpreter> interpreter;
         std::shared_ptr<edgetpu::EdgeTpuContext> edgetpu_context;
         int input_img;
-        int intpu_telem_speed;
+        int input_telem_speed;
         int output_steering;
         int output_throttling;
         int output_mark;

@@ -774,7 +774,7 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
                 TfLiteIntArray* dims = interpreter->tensor(input_telem_speed)->dims;
                 model_input_telem_speed_type = interpreter->tensor(input_telem_speed)->type;
 
-                ROS_INFO("Telem Speed Input idx: %d", input_img);
+                ROS_INFO("Telem Speed Input idx: %d", input_telem_speed);
                 ROS_INFO("expected size: %d", required_shape[0]);
                 ROS_INFO("Input Type : %d (%d %d %d)", model_input_telem_speed_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
                 
