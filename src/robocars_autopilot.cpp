@@ -560,7 +560,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             break;
         }
 
-        if (interpreter->nodes_size()>1) {
+        if ( interpreter->inputs().size()>1) {
             //provide telem speed input
 
             switch (model_input_telem_speed_type) {
@@ -766,16 +766,16 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
                 ROS_INFO("cannot handle input type %d", interpreter->tensor(input_img)->type);
             }
 
-            if (interpreter->nodes_size()>1) {
+            if ( interpreter->inputs().size()>1) {
 
                 input_telem_speed = interpreter->inputs()[1];
-                const auto& required_shape = coral::GetInputShape(*interpreter, 0);
+                const auto& required_shape = coral::GetInputShape(*interpreter, 1);
 
                 TfLiteIntArray* dims = interpreter->tensor(input_telem_speed)->dims;
                 model_input_telem_speed_type = interpreter->tensor(input_telem_speed)->type;
 
                 ROS_INFO("Telem Speed Input idx: %d", input_telem_speed);
-                ROS_INFO("expected size: %d", required_shape[0]);
+                ROS_INFO("expected size: %d", required_shape[1]);
                 ROS_INFO("Input Type : %d (%d %d %d)", model_input_telem_speed_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
                 
                 if ((model_input_telem_speed_type != kTfLiteFloat32) && (model_input_telem_speed_type != kTfLiteInt8) && (model_input_telem_speed_type!= kTfLiteUInt8)) {
