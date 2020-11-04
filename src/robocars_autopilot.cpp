@@ -108,6 +108,8 @@ static float autobrake_steering_thresh;
 static float autobrake_brake_factor;
 static float autobrake_speed_max;
 static float autobrake_speed_thresh;
+static float min_output_throttling;
+static float max_output_throttling;
 
 bool edgetpu_found = false;
 bool autobrake_enabled = false;
@@ -330,6 +332,12 @@ void RosInterface::initParam() {
     if (!node_.hasParam("model_based_throttling")) {
         node_.setParam("model_based_throttling",false);
     }
+    if (!node_.hasParam("max_output_throttling")) {
+        node_.setParam("max_output_throttling",1.0);
+    }
+    if (!node_.hasParam("min_output_throttling")) {
+        node_.setParam("min_output_throttling",0.05);
+    }
 
 
 
@@ -350,6 +358,8 @@ void RosInterface::updateParam() {
     node_.getParam("autobrake_speed_max", autobrake_speed_max);
     node_.getParam("autobrake_enabled", autobrake_enabled);
     node_.getParam("throttle_and_brake_on_mark", throttle_and_brake_on_mark);
+    node_.getParam("min_output_throttling", min_output_throttling);
+    node_.getParam("max_output_throttling", max_output_throttling);
 }
 
 
@@ -648,6 +658,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             throttlingDecision = fmax(0.1,predicted_Throttling);
         }
 
+
+
         if (autobrake_enabled == true) {
             /*
             //Model do not provide brake, implement basic logic
@@ -680,6 +692,10 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 brakingDecision = lastBrake;
             }
         }
+
+        throttlingDecision = fmin (max_output_throttling, throttlingDecision);
+        throttlingDecision = fmax (min_output_throttling, throttlingDecision);
+
         send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0));
