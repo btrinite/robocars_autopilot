@@ -44,11 +44,12 @@ struct IdleStatusEvent              : BaseEvent { public: IdleStatusEvent() : Ba
 struct ManualDrivingEvent           : BaseEvent { public: ManualDrivingEvent() : BaseEvent("ManualDrivingEvent") {}; };
 struct AutonomousDrivingEvent       : BaseEvent { public: AutonomousDrivingEvent() : BaseEvent("AutonomousDrivingEvent") {}; };
 struct PredictEvent                 : BaseEvent { public: 
-    PredictEvent(const _Float32 steeringValue, const _Float32 throttlingValue, const _Float32 brakingValue, const __uint32_t seqNum) : steering_value(steeringValue), throttling_value(throttlingValue), braking_value(brakingValue), seq_num(seqNum), BaseEvent("PredictEvent") {};
+    PredictEvent(const _Float32 steeringValue, const _Float32 throttlingValue, const _Float32 brakingValue, const __uint32_t seqNum, const __uint32_t carId) : steering_value(steeringValue), throttling_value(throttlingValue), braking_value(brakingValue), seq_num(seqNum), carId(carId),  BaseEvent("PredictEvent") {};
     _Float32 steering_value; 
     _Float32 throttling_value; 
     _Float32 braking_value; 
     __uint32_t seq_num;
+    __uint32_t carId;
     };
 
 class RobocarsStateMachine
@@ -109,7 +110,7 @@ class RosInterface
         void initSub();
         void initPub();
 
-        void publishPredict(_Float32 steering, _Float32 throttling, _Float32 braking, __uint32_t seq);
+        void publishPredict(_Float32 steering, _Float32 throttling, _Float32 braking, __uint32_t seq, __uint32_t carId);
 
         void initStats();
         void reportStats();

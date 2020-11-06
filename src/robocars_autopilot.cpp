@@ -147,7 +147,7 @@ class onRunningMode
         };
 
         void react( PredictEvent const & e) override { 
-            ri->publishPredict(e.steering_value, e.throttling_value, e.braking_value, e.seq_num);
+            ri->publishPredict(e.steering_value, e.throttling_value, e.braking_value, e.seq_num, e.carId);
             RobocarsStateMachine::react(e);
         };
 
@@ -262,28 +262,30 @@ _Float32 fmapRange(_Float32 in1,_Float32 in2,_Float32 out1,_Float32 out2,_Float3
   return out1 + ((value-in1)*(out2-out1))/(in2-in1);
 }
 
-void RosInterface::publishPredict(_Float32 steering, _Float32 throttling, _Float32 braking, uint32_t seq) {
+void RosInterface::publishPredict(_Float32 steering, _Float32 throttling, _Float32 braking, uint32_t seq, uint32_t carId) {
     robocars_msgs::robocars_autopilot_output steeringMsg;
     robocars_msgs::robocars_autopilot_output throttlingMsg;
     robocars_msgs::robocars_autopilot_output brakingMsg;
+    char frame_id[100];
+    snprintf(frame_id, sizeof(frame_id), "%d", carId);
 
     steeringMsg.header.stamp = ros::Time::now();
     steeringMsg.header.seq=seq;
-    steeringMsg.header.frame_id = "pilotSteering";
+    steeringMsg.header.frame_id = frame_id;
     steeringMsg.norm = steering;
 
     autopilot_steering_pub.publish(steeringMsg);
 
     throttlingMsg.header.stamp = ros::Time::now();
     throttlingMsg.header.seq=seq;
-    throttlingMsg.header.frame_id = "pilotThrottling";
+    throttlingMsg.header.frame_id = frame_id;
     throttlingMsg.norm = throttling;
 
     autopilot_throttling_pub.publish(throttlingMsg);
 
     brakingMsg.header.stamp = ros::Time::now();
     brakingMsg.header.seq=seq;
-    brakingMsg.header.frame_id = "pilotBraking";
+    brakingMsg.header.frame_id = frame_id;
     brakingMsg.norm = braking;
 
     autopilot_braking_pub.publish(brakingMsg);
@@ -379,7 +381,8 @@ void RosInterface::initPub() {
 }
 
 static uint32_t lastBrakeValue = 0;
-static float lastSpeedValue = 0;
+const unsigned int carIdMax = 10;
+static float lastSpeedValue[carIdMax];
 
 template <class T> void RosInterface::resize(T* out, uint8_t* in, int image_height, int image_width,
             int image_channels, int wanted_height, int wanted_width,
@@ -499,6 +502,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     float throttlingDecision = 0.0;
     float brakingDecision = 0.0;
 
+    unsigned int carId = stoi(image_msg->header.frame_id);
+
     missingSeq = image_msg->header.seq-(lastSeq+1);
     if (missingSeq > 1) {
         updateStats(1, missingSeq);
@@ -577,19 +582,19 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 case kTfLiteFloat32:
                 {
                     float* fillInput = interpreter->typed_tensor<float>(input_telem_speed);
-                    fillInput[0] = (float)lastSpeedValue;
+                    fillInput[0] = (float)lastSpeedValue[carId];
                 }
                 break;
                 case kTfLiteInt8:
                 {
                     int8_t* fillInput = interpreter->typed_tensor<int8_t>(input_telem_speed);
-                    fillInput[0] = (int8_t)(lastSpeedValue * 256);
+                    fillInput[0] = (int8_t)(lastSpeedValue[carId] * 256);
                 }
                 break;
                 case kTfLiteUInt8:
                 {
                     uint8_t* fillInput = interpreter->typed_tensor<uint8_t>(input_telem_speed);
-                    fillInput[0] = (uint8_t)(lastSpeedValue * 128);
+                    fillInput[0] = (uint8_t)(lastSpeedValue[carId] * 128);
                 }
                 break;
             }
@@ -696,9 +701,9 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         throttlingDecision = fmin (max_output_throttling, throttlingDecision);
         throttlingDecision = fmax (min_output_throttling, throttlingDecision);
 
-        send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq));
+        send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq, carId));
     } else {
-        send_event(PredictEvent(0.0,0.0,0.0,0));
+        send_event(PredictEvent(0.0,0.0,0.0,0,carId));
     }
 }
 
@@ -712,7 +717,10 @@ void RosInterface::mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg
 }
 
 void RosInterface::telem_msg_cb(const robocars_msgs::robocars_telemetry::ConstPtr& msg){
-    lastSpeedValue = msg->speed;
+    unsigned int carId = stoi(msg->header.frame_id);
+    if (carId<carIdMax) {
+        lastSpeedValue[carId] = msg->speed;
+    }
 }
 
 void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg) {    
