@@ -131,6 +131,7 @@ class RosInterface
         void callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_msg);
         void mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg);
         void telem_msg_cb(const robocars_msgs::robocars_telemetry::ConstPtr& msg);
+        bool reloadModel (void);
         bool reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response);
 
         template <class T> void resize (T* out, uint8_t* in, int image_height, int image_width,
@@ -177,7 +178,9 @@ class RosInterface
         ros::Publisher stats_pub;
 
         //remote control
+        void rc_load_model(std_msgs::String msg);
         ros::Publisher model_list_pub;
+        ros::Subscriber model_load_sub;
 
 };
 

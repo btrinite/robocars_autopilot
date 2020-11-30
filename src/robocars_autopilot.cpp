@@ -83,6 +83,7 @@ namespace fs = boost::filesystem;
 #include <robocars_msgs/robocars_mark.h>
 #include <robocars_msgs/robocars_autopilot_output.h>
 #include <robocars_msgs/robocars_telemetry.h>
+#include <std_msgs/String.h>
 
 #include "edgetpu.h"
 
@@ -380,6 +381,7 @@ void RosInterface::initSub () {
     mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/annotation/mark", 1, &RosInterface::mark_msg_cb, this);
     telem_sub = node_.subscribe<robocars_msgs::robocars_telemetry>("/telemetry", 1, &RosInterface::telem_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
+    model_load_sub = node_.subscribe<std_msgs::String>("/remote_control/load_model", 1, &RosInterface::rc_load_model, this);
 }
 void RosInterface::initPub() {
     autopilot_steering_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/steering", 1);
@@ -755,7 +757,7 @@ void RosInterface::state_msg_cb(const robocars_msgs::robocars_brain_state::Const
     }    
 }
 
-bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+bool RosInterface::reloadModel() {
     updateParam();
     modelLoaded = false;
     model = tflite::FlatBufferModel::BuildFromFile((model_path+"/"+model_filename).c_str());
@@ -854,6 +856,17 @@ bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::E
 
     return true;
 }
+
+bool RosInterface::reloadModel_cb(std_srvs::Empty::Request& request, std_srvs::Empty::Response& response) {
+    return reloadModel();
+}
+
+void RosInterface::rc_load_model(std_msgs::String msg) {
+
+    node_.setParam("model_filename",  msg.data);
+    reloadModel ();
+}
+
 
 void RosInterface::initStats(void) {
     totalImages=0;
