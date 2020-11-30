@@ -882,14 +882,20 @@ bool RosInterface::updateStats(uint32_t received, uint32_t missed) {
 void RosInterface::updateListOfModels() {
 
     robocars_autopilot::robocars_autopilot_modellist list_of_model_msg;
+    typedef std::multimap<std::time_t, fs::path> result_set_t;
+    result_set_t result_set;
 
     if(fs::is_directory(model_path)) {
 
         for(auto& entry : boost::make_iterator_range(fs::directory_iterator(model_path), {}))
-            list_of_model_msg.models.push_back(entry.path().string());
+            result_set.insert(result_set_t::value_type(fs::last_write_time(entry.path()), entry));
+
     } else {
         ROS_INFO("Failed to list model in path %s", (model_path).c_str());
 
+    }
+    for(result_set_t::iterator it = result_set.begin(); it != result_set.end(); it++){
+        list_of_model_msg.models.push_back(it->second.string());
     }
 
     if (list_of_model_msg.models.size()>0) {
