@@ -881,7 +881,7 @@ void RosInterface::updateListOfModels() {
 
     if (list_of_model_msg.models.size()>0) {
         list_of_model_msg.header.stamp = ros::Time::now();
-        stats_pub.publish(list_of_model_msg);
+        model_list_pub.publish(list_of_model_msg);
     } else {
         ROS_INFO("No models found inpath %s", (model_path).c_str());
 
