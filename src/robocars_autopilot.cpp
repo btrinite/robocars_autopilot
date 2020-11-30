@@ -873,11 +873,17 @@ void RosInterface::updateListOfModels() {
 
         for(auto& entry : boost::make_iterator_range(fs::directory_iterator(model_path), {}))
             list_of_model_msg.models.push_back(entry.path().string());
+    } else {
+        ROS_INFO("Failed to list model in path %s", (model_path).c_str());
+
     }
 
     if (list_of_model_msg.models.size()>0) {
         list_of_model_msg.header.stamp = ros::Time::now();
         stats_pub.publish(list_of_model_msg);
+    } else {
+        ROS_INFO("No models found inpath %s", (model_path).c_str());
+
     }
 }
 
