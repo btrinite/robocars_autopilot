@@ -507,7 +507,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
     updateStats(1, missingSeq);
-    if (missingSeq > 1) {
+    if (missingSeq >= 1) {
         ROS_WARN ("Autopilot: Losing %d images(Seq %d)", missingSeq, image_msg->header.seq);
     };
     lastSeq = image_msg->header.seq;
@@ -705,7 +705,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         throttlingDecision = fmax (min_output_throttling, throttlingDecision);
 
         processing_duration = processing_duration + (ros::Time::now() - t0);
-        procssing_count++;
+        processing_count++;
         send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq, carId));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0,carId));
@@ -867,15 +867,15 @@ void RosInterface::reportStats(void) {
     statsMsg.missedImages = missedImages;
     statsMsg.avg_ftime=0;
     statsMsg.avg_fps=0;
-    if (procssing_count>0) {
+    if (processing_count>0) {
         ros::Duration report_period;
         report_period = statsMsg.header.stamp-period_t0;
-        statsMsg.avg_fps = (int32_t) ((1000000 * procssing_count) / report_period.toNSec());
-        statsMsg.avg_ftime = (int32_t) (processing_duration.toNSec()/procssing_count);
+        statsMsg.avg_fps = (int32_t) ((1000 * processing_count) / (report_period.toNSec()/1000000));
+        statsMsg.avg_ftime = (int32_t) (processing_duration.toNSec()/processing_count);
     }
     stats_pub.publish(statsMsg);
     period_t0=ros::Time::now();
-    procssing_count=0;
+    processing_count=0;
     processing_duration = ros::Duration (0.0);
 
 }

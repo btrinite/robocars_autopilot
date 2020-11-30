@@ -172,7 +172,7 @@ class RosInterface
         uint32_t missedImages=0;
         ros::Time period_t0;
         ros::Duration processing_duration;
-        uint32_t procssing_count=0;
+        uint32_t processing_count=0;
         ros::Publisher stats_pub;
 
 };
