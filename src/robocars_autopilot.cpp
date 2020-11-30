@@ -167,6 +167,7 @@ class onRunningMode
             __tick_count++;
             if ((__tick_count%(uint32_t)(2000/loop_hz))==0) {
                 ri->reportStats();
+                ri->updateListOfModels();
                 ri->updateParam();
             }
         };
