@@ -506,8 +506,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     unsigned int carId = stoi(image_msg->header.frame_id);
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
+    updateStats(1, missingSeq);
     if (missingSeq > 1) {
-        updateStats(1, missingSeq);
         ROS_WARN ("Autopilot: Losing %d images(Seq %d)", missingSeq, image_msg->header.seq);
     };
     lastSeq = image_msg->header.seq;
