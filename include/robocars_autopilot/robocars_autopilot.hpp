@@ -115,6 +115,7 @@ class RosInterface
         void initStats();
         void reportStats();
         bool updateStats(uint32_t received, uint32_t missed);
+        void updateListOfModels();
 
     private:
         void state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg);
@@ -174,6 +175,9 @@ class RosInterface
         ros::Duration processing_duration;
         uint32_t processing_count=0;
         ros::Publisher stats_pub;
+
+        //remote control
+        ros::Publisher model_list_pub;
 
 };
 

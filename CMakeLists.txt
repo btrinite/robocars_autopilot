@@ -53,6 +53,7 @@ find_package(catkin REQUIRED COMPONENTS
  add_message_files(
    FILES
    robocars_autopilot_stats.msg
+   robocars_autopilot_modellist.msg
  )
 
 

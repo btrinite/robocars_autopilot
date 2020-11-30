@@ -51,8 +51,14 @@
 #include <stdlib.h>
 #include <string.h>
 #include <fstream>
+#include <iostream>
 #include <vector>
 #include <queue>
+#include <filesystem>
+#include <boost/filesystem.hpp>
+#include <boost/range/iterator_range.hpp>
+namespace fs = boost::filesystem;
+
 
 #include <boost/format.hpp>
 
@@ -92,6 +98,7 @@
 #include "tensorflow/lite/tools/evaluation/utils.h"
 
 #include <robocars_autopilot/robocars_autopilot_stats.h>
+#include <robocars_autopilot/robocars_autopilot_modellist.h>
 #include <robocars_autopilot.hpp>
 
 RosInterface * ri;
@@ -378,6 +385,7 @@ void RosInterface::initPub() {
     autopilot_throttling_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/throttling", 1);
     autopilot_braking_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/braking", 1);
     stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 1);
+    model_list_pub = node_.advertise<robocars_autopilot::robocars_autopilot_modellist>("/autopilot/models_available", 1);
 }
 
 static uint32_t lastBrakeValue = 0;
@@ -855,6 +863,22 @@ bool RosInterface::updateStats(uint32_t received, uint32_t missed) {
     totalImages+=received;
     missedImages+=missed;
     return false;
+}
+
+void RosInterface::updateListOfModels() {
+
+    robocars_autopilot::robocars_autopilot_modellist list_of_model_msg;
+
+    if(fs::is_directory(model_path)) {
+
+        for(auto& entry : boost::make_iterator_range(fs::directory_iterator(model_path), {}))
+            list_of_model_msg.models.push_back(entry.path().string());
+    }
+
+    if (list_of_model_msg.models.size()>0) {
+        list_of_model_msg.header.stamp = ros::Time::now();
+        stats_pub.publish(list_of_model_msg);
+    }
 }
 
 void RosInterface::reportStats(void) {
