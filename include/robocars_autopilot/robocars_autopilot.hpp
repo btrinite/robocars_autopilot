@@ -98,7 +98,7 @@ void send_event(E const & event)
 class RosInterface
 {
     public :
-        RosInterface() : node_("~") {
+        RosInterface() : node_("~"), period_t0(0.0), processing_duration(0.0) {
             initParam();
             updateParam();
             it = new image_transport::ImageTransport(node_);
@@ -170,6 +170,9 @@ class RosInterface
         // stats
         uint32_t totalImages=0;
         uint32_t missedImages=0;
+        ros::Time period_t0;
+        ros::Duration processing_duration;
+        uint32_t procssing_count=0;
         ros::Publisher stats_pub;
 
 };

@@ -499,6 +499,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     static uint32_t missingSeq = 0;
     static float lastThrottle = throttling_fixed_value;
     static float lastBrake = 0.0;
+    static ros::Time t0;
     float throttlingDecision = 0.0;
     float brakingDecision = 0.0;
 
@@ -512,6 +513,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     lastSeq = image_msg->header.seq;
 
     if (modelLoaded) {
+
+        t0 = ros::Time::now();
 
         const std::vector<int> inputs = interpreter->inputs();
         const std::vector<int> outputs = interpreter->outputs();
@@ -701,6 +704,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         throttlingDecision = fmin (max_output_throttling, throttlingDecision);
         throttlingDecision = fmax (min_output_throttling, throttlingDecision);
 
+        processing_duration = processing_duration + (ros::Time::now() - t0);
+        procssing_count++;
         send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq, carId));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0,carId));
@@ -855,14 +860,23 @@ bool RosInterface::updateStats(uint32_t received, uint32_t missed) {
 void RosInterface::reportStats(void) {
 
     robocars_autopilot::robocars_autopilot_stats statsMsg;
-
     statsMsg.header.stamp = ros::Time::now();
     statsMsg.header.seq=1;
     statsMsg.header.frame_id = "stats";
     statsMsg.totalImages = totalImages;
     statsMsg.missedImages = missedImages;
-
+    statsMsg.avg_ftime=0;
+    statsMsg.avg_fps=0;
+    if (procssing_count>0) {
+        ros::Duration report_period;
+        report_period = statsMsg.header.stamp-period_t0;
+        statsMsg.avg_fps = (int32_t) ((1000000 * procssing_count) / report_period.toNSec());
+        statsMsg.avg_ftime = (int32_t) (processing_duration.toNSec()/procssing_count);
+    }
     stats_pub.publish(statsMsg);
+    period_t0=ros::Time::now();
+    procssing_count=0;
+    processing_duration = ros::Duration (0.0);
 
 }
 
