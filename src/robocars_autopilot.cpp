@@ -894,7 +894,7 @@ void RosInterface::updateListOfModels() {
         ROS_INFO("Failed to list model in path %s", (model_path).c_str());
 
     }
-    for(result_set_t::iterator it = result_set.begin(); it != result_set.end(); it++){
+    for(result_set_t::reverse_iterator it = result_set.rbegin(); it != result_set.rend(); ++it
         list_of_model_msg.models.push_back(it->second.string());
     }
 
