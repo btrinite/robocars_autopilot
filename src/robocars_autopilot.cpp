@@ -377,9 +377,9 @@ void RosInterface::updateParam() {
 void RosInterface::initSub () {
     //sub_image_and_camera = it->subscribeCamera("/front_video_resize/image", 1, &RosInterface::callbackWithCameraInfo, this);
     sub_image = it->subscribe("/front_video_resize/image", 1, &RosInterface::callbackNoCameraInfo, this);
+    telem_sub = node_.subscribe<robocars_msgs::robocars_telemetry>("/telemetry", 1, &RosInterface::telem_msg_cb, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 1, &RosInterface::state_msg_cb, this);
     mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/annotation/mark", 1, &RosInterface::mark_msg_cb, this);
-    telem_sub = node_.subscribe<robocars_msgs::robocars_telemetry>("/telemetry", 1, &RosInterface::telem_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
     model_load_sub = node_.subscribe<std_msgs::String>("/remote_control/load_model", 1, &RosInterface::rc_load_model, this);
 }
