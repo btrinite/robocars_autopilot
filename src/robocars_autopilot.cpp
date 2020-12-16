@@ -118,6 +118,7 @@ static float autobrake_speed_max;
 static float autobrake_speed_thresh;
 static float min_output_throttling;
 static float max_output_throttling;
+static int input_max_queue_size;
 
 bool edgetpu_found = false;
 bool autobrake_enabled = false;
@@ -349,6 +350,9 @@ void RosInterface::initParam() {
     if (!node_.hasParam("min_output_throttling")) {
         node_.setParam("min_output_throttling",0.05);
     }
+    if (!node_.hasParam("input_max_queue_size")) {
+        node_.setParam("input_max_queue_size",1);
+    }
 
 
 
@@ -371,13 +375,14 @@ void RosInterface::updateParam() {
     node_.getParam("throttle_and_brake_on_mark", throttle_and_brake_on_mark);
     node_.getParam("min_output_throttling", min_output_throttling);
     node_.getParam("max_output_throttling", max_output_throttling);
+    node_.getParam("input_max_queue_size", input_max_queue_size);
 }
 
 
 void RosInterface::initSub () {
     //sub_image_and_camera = it->subscribeCamera("/front_video_resize/image", 1, &RosInterface::callbackWithCameraInfo, this);
-    sub_image = it->subscribe("/front_video_resize/image", 1, &RosInterface::callbackNoCameraInfo, this);
-    telem_sub = node_.subscribe<robocars_msgs::robocars_telemetry>("/telemetry", 1, &RosInterface::telem_msg_cb, this);
+    sub_image = it->subscribe("/front_video_resize/image", input_max_queue_size, &RosInterface::callbackNoCameraInfo, this);
+    telem_sub = node_.subscribe<robocars_msgs::robocars_telemetry>("/telemetry", input_max_queue_size, &RosInterface::telem_msg_cb, this);
     state_sub = node_.subscribe<robocars_msgs::robocars_brain_state>("/robocars_brain_state", 1, &RosInterface::state_msg_cb, this);
     mark_sub = node_.subscribe<robocars_msgs::robocars_mark>("/annotation/mark", 1, &RosInterface::mark_msg_cb, this);
     reloadModel_svc = node_.advertiseService("reloadModel", &RosInterface::reloadModel_cb, this);
