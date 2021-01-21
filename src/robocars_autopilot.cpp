@@ -569,7 +569,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 float* fillInput = interpreter->typed_tensor<float>(input_img);
                 for (int i=0; i<in.size();i++) {
                     //fillInput[i] = ((float)in[i]-127.5)/127.5;
-                    fillInput[i] = (float)in[i];
+                    fillInput[i] = (float)in[i]/255.0;
                 }
             }
             break;
