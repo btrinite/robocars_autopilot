@@ -125,6 +125,7 @@ bool autobrake_enabled = false;
 bool throttle_and_brake_on_mark = false;
 bool fix_throttling = false;
 bool model_based_throttling = false;
+bool normalize_input = false;
 
 class onRunningMode;
 class onIdle;
@@ -353,6 +354,9 @@ void RosInterface::initParam() {
     if (!node_.hasParam("input_max_queue_size")) {
         node_.setParam("input_max_queue_size",1);
     }
+    if (!node_.hasParam("normalize_input")) {
+        node_.setParam("normalize_input",false);
+    }
 
 
 
@@ -376,6 +380,7 @@ void RosInterface::updateParam() {
     node_.getParam("min_output_throttling", min_output_throttling);
     node_.getParam("max_output_throttling", max_output_throttling);
     node_.getParam("input_max_queue_size", input_max_queue_size);
+    node_.getParam("normalize_input", normalize_input);
 }
 
 
@@ -569,7 +574,11 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 float* fillInput = interpreter->typed_tensor<float>(input_img);
                 for (int i=0; i<in.size();i++) {
                     //fillInput[i] = ((float)in[i]-127.5)/127.5;
-                    fillInput[i] = (float)in[i]/255.0;
+                    if (normalize_input) {
+                        fillInput[i] = (float)in[i]/255.0;  
+                    } else {
+                        fillInput[i] = (float)in[i];
+                    }
                 }
             }
             break;
