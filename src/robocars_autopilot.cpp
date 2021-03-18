@@ -533,7 +533,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     if (missingSeq >= 1) {
         ROS_WARN ("Autopilot: Losing %d images(Seq %d)", missingSeq, image_msg->header.seq);
     };
-    if (interImageDelay > ros::Duration(0,55000000)) {
+    if (interImageDelay > ros::Duration(0,70000000)) {
         ROS_WARN ("Autopilot: Late image (Seq %d) %lf", image_msg->header.seq, (double)interImageDelay.toNSec());
     };
     lastSeq = image_msg->header.seq;
