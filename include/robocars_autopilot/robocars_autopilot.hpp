@@ -102,6 +102,8 @@ class RosInterface
             initParam();
             updateParam();
             it = new image_transport::ImageTransport(node_);
+            imageCount_= 0;
+            datasetCount_ = 0;
         };
 
 
@@ -126,7 +128,10 @@ class RosInterface
         ros::Publisher autopilot_steering_pub;
         ros::Publisher autopilot_braking_pub;
 
-
+        bool saveData(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename);
+        bool saveImage(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename);
+        void newDataSet ();
+        
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
         void callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_msg);
         void mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg);
@@ -139,6 +144,9 @@ class RosInterface
             int wanted_channels);
         template <class T> float unbind(T* prediction, int prediction_size, size_t num_results,
                TfLiteType input_type);
+
+        size_t imageCount_;
+        size_t datasetCount_;
 
         ros::Subscriber mark_sub;
         ros::Subscriber telem_sub;

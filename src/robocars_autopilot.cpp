@@ -120,6 +120,13 @@ static float min_output_throttling;
 static float max_output_throttling;
 static int input_max_queue_size;
 
+static std::string encoding;
+static std::string filename_pattern;
+static std::string base_path;
+static std::string dataset_path;
+static boost::format file_format;
+static boost::format dataset_path_format;
+
 bool edgetpu_found = false;
 bool autobrake_enabled = false;
 bool throttle_and_brake_on_mark = false;
@@ -241,6 +248,7 @@ class onAutonomousDriving
 
         virtual void entry(void) { 
             onRunningMode::entry();
+            ri->newDataSet();
             ri->initStats();
         };  
 
@@ -359,10 +367,14 @@ void RosInterface::initParam() {
     if (!node_.hasParam("normalize_input")) {
         node_.setParam("normalize_input",false);
     }
-
-
-
+        if (!node_.hasParam("encoding")) {
+        node_.setParam("encoding",  std::string("bgr8"));
+    }
+    if (!node_.hasParam("filename_pattern")) {
+        node_.setParam("filename_pattern",std::string("%s/front%08i.%s"));
+    }
 }
+
 void RosInterface::updateParam() {
     node_.getParam("loop_hz", loop_hz);
     node_.getParam("model_path", model_path);
@@ -383,6 +395,11 @@ void RosInterface::updateParam() {
     node_.getParam("max_output_throttling", max_output_throttling);
     node_.getParam("input_max_queue_size", input_max_queue_size);
     node_.getParam("normalize_input", normalize_input);
+    node_.getParam("encoding", encoding);
+    node_.getParam("filename_pattern", filename_pattern);
+    node_.getParam("base_path", base_path);
+    file_format.parse(filename_pattern);
+
 }
 
 
@@ -401,6 +418,75 @@ void RosInterface::initPub() {
     autopilot_braking_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/braking", 1);
     stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 1);
     model_list_pub = node_.advertise<robocars_autopilot::robocars_autopilot_modellist>("/autopilot/models_available", 1);
+}
+
+void RosInterface::newDataSet () {
+    imageCount_ = 0;
+    datasetCount_++;
+    do {
+        dataset_path = (dataset_path_format % base_path % date::format("%F", std::chrono::system_clock::now()) % "closepilot" % datasetCount_).str();
+        if (dirExists(dataset_path.c_str())==0) {
+             mkdir(dataset_path.c_str(), 0777);
+             ROS_INFO("New Dataset %s", dataset_path.c_str());
+            return;
+        }
+        datasetCount_++;
+    } while (true);
+}
+
+bool RosInterface::saveImage(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename) {
+    cv::Mat image;
+    try
+    {
+      image = cv_bridge::toCvShare(image_msg, encoding)->image;
+    } catch(cv_bridge::Exception)
+    {
+      ROS_ERROR("Unable to convert %s image to %s", image_msg->encoding.c_str(), encoding.c_str());
+      return false;
+    }
+
+    if (!image.empty()) {
+      try {
+        jpgFilename = (file_format % dataset_path % imageCount_ % "jpg").str();
+      } catch (...) { file_format.clear(); }
+
+      cv::imwrite(jpgFilename, image);
+      if ((imageCount_%100)==0) {
+        ROS_INFO("Data Capture: %05ld images saved", imageCount_);
+      }
+    
+    } else {
+        ROS_WARN("Couldn't save image, no data!");
+        return false;
+    }
+    return true;
+}
+
+bool RosInterface::saveData(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename) {
+   json::JSON obj;
+   std::ofstream jsonFile;
+   std::string jsonFilename;
+
+   jsonFilename = jpgFilename;
+   jsonFilename.replace(jpgFilename.rfind("."), jpgFilename.length(), ".json");
+   jsonFile.open(jsonFilename);
+   obj["cam/image_array"] = basename(jpgFilename.c_str());
+   obj["cam/seq"] = (uint32_t) (image_msg->header.seq);
+   obj["ms"] = (uint64_t) (image_msg->header.stamp.toNSec()/1e3);
+   obj["angle"] = lastSteeringValue;
+   obj["throttle"] = lastThrottlingValue;
+   obj["mode"] = drivingMode2str[drivingMode];
+   obj["tof1"] = lastTof1Value;
+   obj["tof2"] = lastTof2Value;
+   obj["mark"] = lastMarkValue;
+   obj["linmark"] = lastLinMarkValue;
+   obj["brake"] = lastBrakingValue;
+   obj["telem/speed"] = lastSpeedValue;
+   obj["telem/cte"] = lastCTEValue;
+   jsonFile << obj << std::endl;
+   jsonFile.close();
+ 
+   return true;
 }
 
 static uint32_t lastBrakeValue = 0;
@@ -527,6 +613,8 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     float brakingDecision = 0.0;
     ros::Duration interImageDelay = ros::Time::now()  - lastTsImage;
     unsigned int carId = stoi(image_msg->header.frame_id);
+    std::string jpgFilename;
+
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
     updateStats(1, missingSeq);
@@ -540,6 +628,13 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     lastTsImage = ros::Time::now();
 
     if (modelLoaded) {
+
+        if (!saveImage(image_msg, jpgFilename))
+            return;
+
+            // save the metadata
+        saveData (image_msg, jpgFilename);
+        imageCount_++;
 
         t0 = ros::Time::now();
 
