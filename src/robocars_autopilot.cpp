@@ -525,7 +525,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     static ros::Time t0;
     float throttlingDecision = 0.0;
     float brakingDecision = 0.0;
-    ros::interImageDelay = ros::Time::now()  - lastTsImage;
+    ros::Duration interImageDelay = ros::Time::now()  - lastTsImage;
     unsigned int carId = stoi(image_msg->header.frame_id);
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
