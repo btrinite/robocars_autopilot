@@ -127,6 +127,8 @@ bool fix_throttling = false;
 bool model_based_throttling = false;
 bool normalize_input = false;
 
+ros::Time lastTsImage (0.001); 
+
 class onRunningMode;
 class onIdle;
 class onManualDriving;
@@ -523,7 +525,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     static ros::Time t0;
     float throttlingDecision = 0.0;
     float brakingDecision = 0.0;
-
+    ros::interImageDelay = ros::Time::now()  - lastTsImage;
     unsigned int carId = stoi(image_msg->header.frame_id);
 
     missingSeq = image_msg->header.seq-(lastSeq+1);
@@ -531,7 +533,11 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     if (missingSeq >= 1) {
         ROS_WARN ("Autopilot: Losing %d images(Seq %d)", missingSeq, image_msg->header.seq);
     };
+    if (interImageDelay > ros::Duration(0,55000000)) {
+        ROS_WARN ("Autopilot: Late image (Seq %d) %lf", image_msg->header.seq, (double)interImageDelay.toNSec());
+    };
     lastSeq = image_msg->header.seq;
+    lastTsImage = os::Time::now();
 
     if (modelLoaded) {
 
