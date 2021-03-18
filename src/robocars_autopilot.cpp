@@ -462,7 +462,7 @@ bool RosInterface::saveImage(const sensor_msgs::ImageConstPtr& image_msg, std::s
     return true;
 }
 
-bool RosInterface::saveData(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename) {
+bool RosInterface::saveData(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename, _Float32 lastSteeringValue, _Float32 lastThrottlingValue, _Float32 lastSpeedValue) {
    json::JSON obj;
    std::ofstream jsonFile;
    std::string jsonFilename;
@@ -475,14 +475,8 @@ bool RosInterface::saveData(const sensor_msgs::ImageConstPtr& image_msg, std::st
    obj["ms"] = (uint64_t) (image_msg->header.stamp.toNSec()/1e3);
    obj["angle"] = lastSteeringValue;
    obj["throttle"] = lastThrottlingValue;
-   obj["mode"] = drivingMode2str[drivingMode];
-   obj["tof1"] = lastTof1Value;
-   obj["tof2"] = lastTof2Value;
-   obj["mark"] = lastMarkValue;
-   obj["linmark"] = lastLinMarkValue;
-   obj["brake"] = lastBrakingValue;
+   obj["mode"] = "closepilot";
    obj["telem/speed"] = lastSpeedValue;
-   obj["telem/cte"] = lastCTEValue;
    jsonFile << obj << std::endl;
    jsonFile.close();
  
@@ -633,8 +627,6 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             return;
 
             // save the metadata
-        saveData (image_msg, jpgFilename);
-        imageCount_++;
 
         t0 = ros::Time::now();
 
@@ -832,6 +824,10 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
 
         processing_duration = processing_duration + (ros::Time::now() - t0);
         processing_count++;
+
+        saveData (image_msg, jpgFilename, predicted_Steering, throttlingDecision, input_telem_speed);
+        imageCount_++;
+
         send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq, carId));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0,carId));
