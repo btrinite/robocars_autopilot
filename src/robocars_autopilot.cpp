@@ -134,6 +134,7 @@ bool throttle_and_brake_on_mark = false;
 bool fix_throttling = false;
 bool model_based_throttling = false;
 bool normalize_input = false;
+bool recordData=false;
 
 ros::Time lastTsImage (0.001); 
 
@@ -196,6 +197,7 @@ class onIdle
     private:
         void entry(void) override {
             onRunningMode::entry();
+            recordData=false;
         };
   
         void react(ManualDrivingEvent const & e) override { 
@@ -220,6 +222,7 @@ class onManualDriving
 
         void entry(void) override {
             onRunningMode::entry();
+            recordData=false;
             ri->initStats();
         };
 
@@ -250,6 +253,7 @@ class onAutonomousDriving
         virtual void entry(void) { 
             onRunningMode::entry();
             ri->newDataSet();
+            recordData=true;
             ri->initStats();
         };  
 
@@ -1058,6 +1062,7 @@ int main(int argc, char **argv)
 {
     ros::init(argc, argv, "robocars_autopilot");
     
+    dataset_path_format.parse("%s/%s-%s-%02d/");
     ri = new RosInterface;
 
     ri->initPub();
