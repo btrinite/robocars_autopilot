@@ -645,7 +645,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
 
     if (modelLoaded) {
 
-        if (auto_record0) {
+        if (auto_record) {
            saveImage(image_msg, jpgFilename)
 
         }
@@ -848,7 +848,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         processing_duration = processing_duration + (ros::Time::now() - t0);
         processing_count++;
 
-        if (auto_record0) {
+        if (auto_record) {
             saveData (image_msg, jpgFilename, predicted_Steering, throttlingDecision, lastSpeedValue[carId]);
             imageCount_++;
         }
