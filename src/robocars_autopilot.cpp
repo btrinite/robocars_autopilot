@@ -134,6 +134,7 @@ bool throttle_and_brake_on_mark = false;
 bool fix_throttling = false;
 bool model_based_throttling = false;
 bool normalize_input = false;
+bool auto_record = false;
 bool recordData=false;
 
 ros::Time lastTsImage (0.001); 
@@ -372,11 +373,14 @@ void RosInterface::initParam() {
     if (!node_.hasParam("normalize_input")) {
         node_.setParam("normalize_input",false);
     }
-        if (!node_.hasParam("encoding")) {
+    if (!node_.hasParam("encoding")) {
         node_.setParam("encoding",  std::string("bgr8"));
     }
     if (!node_.hasParam("filename_pattern")) {
         node_.setParam("filename_pattern",std::string("%s/front%08i.%s"));
+    }
+    if (!node_.hasParam("auto_record")) {
+        node_.setParam("auto_record",false);
     }
 }
 
@@ -400,6 +404,7 @@ void RosInterface::updateParam() {
     node_.getParam("max_output_throttling", max_output_throttling);
     node_.getParam("input_max_queue_size", input_max_queue_size);
     node_.getParam("normalize_input", normalize_input);
+    node_.getParam("auto_record", auto_record);
     node_.getParam("encoding", encoding);
     node_.getParam("filename_pattern", filename_pattern);
     node_.getParam("base_path", base_path);
@@ -640,10 +645,11 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
 
     if (modelLoaded) {
 
-        if (!saveImage(image_msg, jpgFilename))
-            return;
+        if (auto_record0) {
+           saveImage(image_msg, jpgFilename)
 
-            // save the metadata
+        }
+        // save the metadata
 
         t0 = ros::Time::now();
 
@@ -842,9 +848,10 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         processing_duration = processing_duration + (ros::Time::now() - t0);
         processing_count++;
 
-        saveData (image_msg, jpgFilename, predicted_Steering, throttlingDecision, lastSpeedValue[carId]);
-        imageCount_++;
-
+        if (auto_record0) {
+            saveData (image_msg, jpgFilename, predicted_Steering, throttlingDecision, lastSpeedValue[carId]);
+            imageCount_++;
+        }
         send_event(PredictEvent(predicted_Steering,throttlingDecision, brakingDecision, image_msg->header.seq, carId));
     } else {
         send_event(PredictEvent(0.0,0.0,0.0,0,carId));
