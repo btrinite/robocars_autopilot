@@ -128,10 +128,10 @@ class RosInterface
         ros::Publisher autopilot_steering_pub;
         ros::Publisher autopilot_braking_pub;
 
-        bool saveData(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename);
+        bool saveData(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename, _Float32 lastSteeringValue, _Float32 lastThrottlingValue, _Float32 lastSpeedValue);
         bool saveImage(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename);
         void newDataSet ();
-        
+
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
         void callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_msg);
         void mark_msg_cb(const robocars_msgs::robocars_mark::ConstPtr& msg);
