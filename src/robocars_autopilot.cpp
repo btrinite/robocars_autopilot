@@ -537,7 +537,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
         ROS_WARN ("Autopilot: Late image (Seq %d) %lf", image_msg->header.seq, (double)interImageDelay.toNSec());
     };
     lastSeq = image_msg->header.seq;
-    lastTsImage = os::Time::now();
+    lastTsImage = ros::Time::now();
 
     if (modelLoaded) {
 
