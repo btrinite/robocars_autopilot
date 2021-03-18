@@ -646,8 +646,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
     if (modelLoaded) {
 
         if (auto_record) {
-           saveImage(image_msg, jpgFilename)
-
+           saveImage(image_msg, jpgFilename);
         }
         // save the metadata
 
