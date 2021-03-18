@@ -118,6 +118,7 @@ class RosInterface
         void reportStats();
         bool updateStats(uint32_t received, uint32_t missed);
         void updateListOfModels();
+        void newDataSet ();
 
     private:
         void state_msg_cb(const robocars_msgs::robocars_brain_state::ConstPtr& msg);
@@ -130,7 +131,6 @@ class RosInterface
 
         bool saveData(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename, _Float32 lastSteeringValue, _Float32 lastThrottlingValue, _Float32 lastSpeedValue);
         bool saveImage(const sensor_msgs::ImageConstPtr& image_msg, std::string &jpgFilename);
-        void newDataSet ();
 
         void callbackWithCameraInfo(const sensor_msgs::ImageConstPtr& image_msg, const sensor_msgs::CameraInfoConstPtr& info);
         void callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_msg);

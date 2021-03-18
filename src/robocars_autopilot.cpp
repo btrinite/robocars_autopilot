@@ -59,8 +59,9 @@
 #include <boost/range/iterator_range.hpp>
 namespace fs = boost::filesystem;
 
-
 #include <boost/format.hpp>
+
+#include <opencv2/highgui/highgui.hpp>
 
 #include <date.h>
 #include <json.hpp>
@@ -418,6 +419,18 @@ void RosInterface::initPub() {
     autopilot_braking_pub = node_.advertise<robocars_msgs::robocars_autopilot_output>("/autopilot/braking", 1);
     stats_pub = node_.advertise<robocars_autopilot::robocars_autopilot_stats>("/autopilot/stats", 1);
     model_list_pub = node_.advertise<robocars_autopilot::robocars_autopilot_modellist>("/autopilot/models_available", 1);
+}
+
+int dirExists(const char *path)
+{
+    struct stat info;
+
+    if(stat( path, &info ) != 0)
+        return 0;
+    else if(info.st_mode & S_IFDIR)
+        return 1;
+    else
+        return 0;
 }
 
 void RosInterface::newDataSet () {
