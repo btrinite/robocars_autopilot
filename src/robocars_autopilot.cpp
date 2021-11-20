@@ -690,7 +690,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
                 for (int i=0; i<in.size();i++) {
                     //fillInput[i] = ((float)in[i]-127.5)/127.5;
                     if (normalize_input) {
-                        fillInput[i] = (float)in[i]/255.0;  
+                        fillInput[i] = (float)in[i]*1.0/255.0;  
                     } else {
                         fillInput[i] = (float)in[i];
                     }
