@@ -761,21 +761,23 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             break;
         }
 
-        float predicted_Throttling;
-        switch (interpreter->tensor(output_throttling)->type) {
-            case kTfLiteFloat32:
-                predicted_Throttling = unbind<float>(interpreter->typed_tensor<float>(output_throttling),
-                output_throttling_size, 1, model_output_throttling_type);
-            break;    
-            case kTfLiteInt8:
-                predicted_Throttling = unbind<int8_t>(interpreter->typed_tensor<int8_t>(output_throttling),
-                        output_throttling_size, 1, model_output_throttling_type);
+        float predicted_Throttling = 0.0;
+        if (output_throttling>-1) {
+            switch (interpreter->tensor(output_throttling)->type) {
+                case kTfLiteFloat32:
+                    predicted_Throttling = unbind<float>(interpreter->typed_tensor<float>(output_throttling),
+                    output_throttling_size, 1, model_output_throttling_type);
+                break;    
+                case kTfLiteInt8:
+                    predicted_Throttling = unbind<int8_t>(interpreter->typed_tensor<int8_t>(output_throttling),
+                            output_throttling_size, 1, model_output_throttling_type);
+                    break;
+                case kTfLiteUInt8:
+                    predicted_Throttling = unbind<uint8_t>(interpreter->typed_tensor<uint8_t>(output_throttling),
+                            output_throttling_size, 1, model_output_throttling_type);
+                    predicted_Throttling = -1.0 + (predicted_Throttling*2.0);        
                 break;
-            case kTfLiteUInt8:
-                predicted_Throttling = unbind<uint8_t>(interpreter->typed_tensor<uint8_t>(output_throttling),
-                        output_throttling_size, 1, model_output_throttling_type);
-                predicted_Throttling = -1.0 + (predicted_Throttling*2.0);        
-            break;
+            }
         }
 
         float predicted_Mark=0.0;
@@ -912,6 +914,9 @@ bool RosInterface::reloadModel() {
         if (!interpreter) {
             ROS_INFO("Failed to construct interpreter");
         } else {
+
+            output_steering = -1;
+            output_throttling = -1;
 
             ROS_INFO("tensors size: %ld", interpreter->tensors_size());
             ROS_INFO("nodes size: %ld", interpreter->nodes_size());
