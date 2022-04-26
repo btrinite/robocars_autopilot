@@ -906,7 +906,6 @@ bool RosInterface::reloadModel() {
         tflite::ops::builtin::BuiltinOpResolver resolver;
         if (!edgetpu_context) {
             tflite::InterpreterBuilder(*model, resolver)(&interpreter);
-            interpreter->SetAllowFp16PrecisionForFp32(settings->allow_fp16);
         } else {
             interpreter = std::move(coral::BuildEdgeTpuInterpreter(*model, edgetpu_context.get()));
         }
@@ -924,18 +923,6 @@ bool RosInterface::reloadModel() {
             ROS_INFO("outputs: %ld", interpreter->outputs().size());
             for (uint idx=0;idx<interpreter->outputs().size();idx++) {
                 ROS_INFO("  output(%d) name: %s", idx, interpreter->GetOutputName(idx));
-            }
-
-            auto delegates = delegate_providers.CreateAllDelegates();
-            for (auto& delegate : delegates) {
-                const auto delegate_name = delegate.provider->GetName();
-                if (interpreter->ModifyGraphWithDelegate(std::move(delegate.delegate)) !=
-                    kTfLiteOk) {
-                    ROS_INFO("Failed to apply %s delegate.",delegate_name);
-                    exit(-1);
-                } else {
-                    ROS_INFO("Applied %s delegate.",delegate_name);
-                }
             }
 
             if (interpreter->AllocateTensors() != kTfLiteOk) {
