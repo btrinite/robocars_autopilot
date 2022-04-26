@@ -707,7 +707,7 @@ void RosInterface::callbackNoCameraInfo(const sensor_msgs::ImageConstPtr& image_
             case kTfLiteUInt8:
             {
                 /*WIP resize code (based on tf operators) not working on edge tpu for now, since image input is already at the correct size, just copy image as is in tensor*/
-                  uint8_t* fillInput = interpreter->typed_input_tensor<uint8_t>(input_img);
+                  uint8_t* fillInput = interpreter->typed_tensor<uint8_t>(input_img);
                   std::memcpy(fillInput, in.data(), in.size());
                 /*
                 resize<uint8_t>(interpreter->typed_input_tensor<uint8_t>(input), in.data(),
@@ -903,7 +903,6 @@ bool RosInterface::reloadModel() {
             edgetpu_context =
                 edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
         }
-        tflite::ops::builtin::BuiltinOpResolver resolver;
         if (!edgetpu_context) {
             tflite::InterpreterBuilder(*model, resolver)(&interpreter);
         } else {
@@ -936,9 +935,9 @@ bool RosInterface::reloadModel() {
             model_input_img_type = interpreter->tensor(input_img)->type;
 
             ROS_INFO("Image Input idx: %d", input_img);
-            ROS_INFO("expected height: %d", dims[0]);
-            ROS_INFO("expected width: %d", dims[1]);
-            ROS_INFO("expected channels: %d", dims[2]);
+            ROS_INFO("expected height: %d", dims[2]);
+            ROS_INFO("expected width: %d", dims[3]);
+            ROS_INFO("expected channels: %d", dims[4]);
             ROS_INFO("Input Type : %d (%d %d %d)", model_input_img_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
             
             if ((model_input_img_type != kTfLiteFloat32) && (model_input_img_type != kTfLiteInt8) && (model_input_img_type!= kTfLiteUInt8)) {
@@ -952,7 +951,7 @@ bool RosInterface::reloadModel() {
                 model_input_telem_speed_type = interpreter->tensor(input_telem_speed)->type;
 
                 ROS_INFO("Telem Speed Input idx: %d", input_telem_speed);
-                ROS_INFO("expected size: %d", dims[0]);
+                ROS_INFO("expected size: %d", dims[1]);
                 ROS_INFO("Input Type : %d (%d %d %d)", model_input_telem_speed_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
                 
                 if ((model_input_telem_speed_type != kTfLiteFloat32) && (model_input_telem_speed_type != kTfLiteInt8) && (model_input_telem_speed_type!= kTfLiteUInt8)) {
@@ -969,15 +968,15 @@ bool RosInterface::reloadModel() {
             ROS_INFO("Output Steering Size : %d", output_steering_size);
             ROS_INFO("Output Steering Type : %d", model_output_steering_type);
 
-            output_throttling = interpreter->outputs()[1];
-            output_dims = interpreter->tensor(output_throttling)->dims;
-            output_throttling_size = output_dims->data[output_dims->size - 1];
-            model_output_throttling_type = interpreter->tensor(output_throttling)->type;
-            ROS_INFO("Output Throttling Idx : %d", output_throttling);
-            ROS_INFO("Output Throttling Size : %d", output_throttling_size);
-            ROS_INFO("Output Throttling Type : %d", model_output_throttling_type);
-
             if (interpreter->outputs().size()>2) {
+                output_throttling = interpreter->outputs()[1];
+                output_dims = interpreter->tensor(output_throttling)->dims;
+                output_throttling_size = output_dims->data[output_dims->size - 1];
+                model_output_throttling_type = interpreter->tensor(output_throttling)->type;
+                ROS_INFO("Output Throttling Idx : %d", output_throttling);
+                ROS_INFO("Output Throttling Size : %d", output_throttling_size);
+                ROS_INFO("Output Throttling Type : %d", model_output_throttling_type);
+
                 output_mark = interpreter->outputs()[2];
                 output_dims = interpreter->tensor(output_mark)->dims;
                 output_mark_size = output_dims->data[output_dims->size - 1];
