@@ -903,8 +903,10 @@ bool RosInterface::reloadModel() {
             edgetpu_context =
                 edgetpu::EdgeTpuManager::GetSingleton()->OpenDevice();
         }
+        tflite::ops::builtin::BuiltinOpResolver resolver;
         if (!edgetpu_context) {
-            interpreter = std::move(coral::BuildInterpreter(*model));
+            tflite::InterpreterBuilder(*model, resolver)(&interpreter);
+            interpreter->SetAllowFp16PrecisionForFp32(settings->allow_fp16);
         } else {
             interpreter = std::move(coral::BuildEdgeTpuInterpreter(*model, edgetpu_context.get()));
         }
@@ -924,16 +926,32 @@ bool RosInterface::reloadModel() {
                 ROS_INFO("  output(%d) name: %s", idx, interpreter->GetOutputName(idx));
             }
 
+            auto delegates = delegate_providers.CreateAllDelegates();
+            for (auto& delegate : delegates) {
+                const auto delegate_name = delegate.provider->GetName();
+                if (interpreter->ModifyGraphWithDelegate(std::move(delegate.delegate)) !=
+                    kTfLiteOk) {
+                    ROS_INFO("Failed to apply %s delegate.",delegate_name);
+                    exit(-1);
+                } else {
+                    ROS_INFO("Applied %s delegate.",delegate_name);
+                }
+            }
+
+            if (interpreter->AllocateTensors() != kTfLiteOk) {
+                LOG(ERROR) << "Failed to allocate tensors!";
+                exit(-1);
+            }
+
             input_img = interpreter->inputs()[0];
-            const auto& required_shape = coral::GetInputShape(*interpreter, 0);
 
             TfLiteIntArray* dims = interpreter->tensor(input_img)->dims;
             model_input_img_type = interpreter->tensor(input_img)->type;
 
             ROS_INFO("Image Input idx: %d", input_img);
-            ROS_INFO("expected height: %d", required_shape[0]);
-            ROS_INFO("expected width: %d", required_shape[1]);
-            ROS_INFO("expected channels: %d", required_shape[2]);
+            ROS_INFO("expected height: %d", dims[0]);
+            ROS_INFO("expected width: %d", dims[1]);
+            ROS_INFO("expected channels: %d", dims[2]);
             ROS_INFO("Input Type : %d (%d %d %d)", model_input_img_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
             
             if ((model_input_img_type != kTfLiteFloat32) && (model_input_img_type != kTfLiteInt8) && (model_input_img_type!= kTfLiteUInt8)) {
@@ -943,13 +961,11 @@ bool RosInterface::reloadModel() {
             if ( interpreter->inputs().size()>1) {
 
                 input_telem_speed = interpreter->inputs()[1];
-                const auto& required_shape = coral::GetInputShape(*interpreter, 1);
-
                 TfLiteIntArray* dims = interpreter->tensor(input_telem_speed)->dims;
                 model_input_telem_speed_type = interpreter->tensor(input_telem_speed)->type;
 
                 ROS_INFO("Telem Speed Input idx: %d", input_telem_speed);
-                ROS_INFO("expected size: %d", required_shape[1]);
+                ROS_INFO("expected size: %d", dims[0]);
                 ROS_INFO("Input Type : %d (%d %d %d)", model_input_telem_speed_type, kTfLiteFloat32, kTfLiteInt8, kTfLiteUInt8);
                 
                 if ((model_input_telem_speed_type != kTfLiteFloat32) && (model_input_telem_speed_type != kTfLiteInt8) && (model_input_telem_speed_type!= kTfLiteUInt8)) {
@@ -970,6 +986,7 @@ bool RosInterface::reloadModel() {
             output_dims = interpreter->tensor(output_throttling)->dims;
             output_throttling_size = output_dims->data[output_dims->size - 1];
             model_output_throttling_type = interpreter->tensor(output_throttling)->type;
+            ROS_INFO("Output Throttling Idx : %d", output_throttling);
             ROS_INFO("Output Throttling Size : %d", output_throttling_size);
             ROS_INFO("Output Throttling Type : %d", model_output_throttling_type);
 
