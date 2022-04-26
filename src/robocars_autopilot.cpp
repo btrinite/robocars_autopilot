@@ -926,7 +926,7 @@ bool RosInterface::reloadModel() {
             }
 
             if (interpreter->AllocateTensors() != kTfLiteOk) {
-                LOG(ERROR) << "Failed to allocate tensors!";
+                ROS_INFO ("Failed to allocate tensors!");
                 exit(-1);
             }
 
